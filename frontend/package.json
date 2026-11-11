@@ -1,0 +1,20 @@
+{
+  "name": "mars-probes-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "react": "19.2.6",
+    "react-dom": "19.2.6"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.5",
+    "@vitejs/plugin-react": "6.0.2",
+    "tailwindcss": "4.3.5",
+    "vite": "8.0.13"
+  }
+}
