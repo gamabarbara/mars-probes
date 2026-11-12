@@ -128,7 +128,7 @@ Para verificar a integração entre interface, API e banco, execute o [primeiro 
 | --- | --- |
 | [`frontend/src/`](frontend/src/) | Interface React em TypeScript, com mapa, lista e formulários. |
 | [`backend/api/`](backend/api/) | Rotas FastAPI, validação HTTP e respostas de erro. |
-| [`backend/probe_service.py`](backend/probe_service.py) | Casos de uso e limites das transações. |
+| [`backend/services/probe_service.py`](backend/services/probe_service.py) | Casos de uso e limites das transações. |
 | [`backend/domain.py`](backend/domain.py) | Regras de posição, direção e movimento, independentes da API e do banco. |
 | [`backend/persistence/`](backend/persistence/) | Repositório, modelos e transações SQLite com SQLAlchemy. |
 | [`compose.yaml`](compose.yaml) | Configuração dos serviços e do volume de dados. |

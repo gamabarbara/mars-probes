@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from api.error_handlers import register_error_handlers
 from api.probes_rest import create_probes_router
 from persistence.database import Database
-from probe_service import ProbeService
+from services.probe_service import ProbeService
 
 
 def create_app(database_path: Path) -> FastAPI:

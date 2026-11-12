@@ -7,9 +7,10 @@ ENV UV_PYTHON_DOWNLOADS=never
 COPY pyproject.toml uv.lock ./
 RUN uv sync --locked --no-dev
 
-COPY domain.py main.py probe_service.py ./
+COPY domain.py main.py ./
 COPY api/ ./api/
 COPY persistence/ ./persistence/
+COPY services/ ./services/
 
 EXPOSE 8000
 CMD [".venv/bin/uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

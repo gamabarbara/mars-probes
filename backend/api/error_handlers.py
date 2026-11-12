@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from api.i18n import error_message
 from domain import OutOfBoundsError
 from persistence.database import DatabaseBusyError
-from probe_service import ProbeNotFoundError
+from services.probe_service import ProbeNotFoundError
 
 
 class ErrorResponse(BaseModel):

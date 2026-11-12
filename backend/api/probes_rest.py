@@ -18,7 +18,7 @@ from api.schemas import (
     ProbeResponse,
 )
 from domain import Probe
-from probe_service import ProbeService
+from services.probe_service import ProbeService
 
 PROBE_PREFIX = "/probes"
 PROBE_TAG = "probes"

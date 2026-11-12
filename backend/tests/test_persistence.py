@@ -7,16 +7,53 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from domain import Direction, Grid, Probe
-from persistence.database import Database
+from persistence import database as database_module
+from persistence.database import Database, DatabaseBusyError
 from persistence.models import ProbeRecord
 from persistence.repository import ProbeRepository
-from probe_service import ProbeService
+from services.probe_service import ProbeService
 
 
-def test_repository_preserves_legacy_database(tmp_path: Path) -> None:
-    database = tmp_path / "probes.sqlite3"
+@pytest.fixture
+def store(database_path: Path) -> Database:
+    database = Database(database_path)
+    database.initialize()
+    return database
+
+
+def test_transaction_rolls_back_flushed_changes(store: Database) -> None:
+    with (
+        pytest.raises(ValueError, match="rejected operation"),
+        store.transaction() as session,
+    ):
+        repository = ProbeRepository(session)
+        repository.insert(Probe.at_origin("first", Grid(5, 5), Direction.NORTH))
+        session.flush()
+        assert session.get(ProbeRecord, "first") is not None
+        raise ValueError("rejected operation")
+
+    with Session(store.engine) as session:
+        assert session.get(ProbeRecord, "first") is None
+
+
+def test_transaction_reports_busy_database_on_write(
+    database_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(database_module, "WRITE_TIMEOUT_SECONDS", 0)
+    database = Database(database_path)
+    database.initialize()
+
+    with closing(connect(database_path)) as writer:
+        writer.execute("UPDATE probes SET x = x")
+        with pytest.raises(DatabaseBusyError), database.transaction() as session:
+            ProbeRepository(session).insert(
+                Probe.at_origin("first", Grid(5, 5), Direction.NORTH)
+            )
+
+
+def test_repository_preserves_legacy_database(database_path: Path) -> None:
     schema = Path(__file__).with_name("fixtures") / "legacy_schema.sql"
-    with closing(connect(database)) as connection:
+    with closing(connect(database_path)) as connection:
         connection.executescript(schema.read_text())
         connection.execute(
             "INSERT INTO probes VALUES (?, ?, ?, ?, ?, ?)",
@@ -24,7 +61,7 @@ def test_repository_preserves_legacy_database(tmp_path: Path) -> None:
         )
         connection.commit()
 
-    store = Database(database)
+    store = Database(database_path)
     store.initialize()
     store.initialize()
     with store.transaction() as session:
@@ -32,7 +69,7 @@ def test_repository_preserves_legacy_database(tmp_path: Path) -> None:
             Probe.at_origin("new", Grid(4, 4), Direction.NORTH)
         )
 
-    with closing(connect(database)) as connection:
+    with closing(connect(database_path)) as connection:
         assert connection.execute(
             "SELECT * FROM probes WHERE id = ?", ("existing",)
         ).fetchone() == ("existing", 5, 6, 2, 3, "WEST")
@@ -60,10 +97,8 @@ def test_repository_preserves_legacy_database(tmp_path: Path) -> None:
     ],
 )
 def test_database_enforces_constraints(
-    tmp_path: Path, fields: dict[str, object]
+    store: Database, fields: dict[str, object]
 ) -> None:
-    store = Database(tmp_path / "probes.sqlite3")
-    store.initialize()
     values = {
         "id": "invalid",
         "max_x": 5,
@@ -84,9 +119,9 @@ def test_database_enforces_constraints(
         assert session.get(ProbeRecord, "invalid") is None
 
 
-def test_failed_insert_rolls_back_and_repository_remains_usable(tmp_path: Path) -> None:
-    store = Database(tmp_path / "probes.sqlite3")
-    store.initialize()
+def test_failed_insert_rolls_back_and_repository_remains_usable(
+    store: Database,
+) -> None:
     probe = Probe.at_origin("first", Grid(5, 5), Direction.EAST)
     with store.transaction() as session:
         ProbeRepository(session).insert(probe)
