@@ -35,5 +35,10 @@ class ProbeResponse(BaseModel):
     direction: Direction
 
 
+class ProbeDetailResponse(ProbeResponse):
+    max_x: GridLimit = Field(validation_alias=AliasPath("grid", "max_x"))
+    max_y: GridLimit = Field(validation_alias=AliasPath("grid", "max_y"))
+
+
 class ProbeListResponse(BaseModel):
     probes: list[ProbeResponse]

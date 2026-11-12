@@ -9,6 +9,14 @@ class ProbeNotFoundError(Exception):
     pass
 
 
+def get_probe(database: Database, *, probe_id: str) -> Probe:
+    with database.read_session() as session:
+        probe = ProbeRepository(session).get(probe_id)
+        if probe is None:
+            raise ProbeNotFoundError(probe_id)
+        return probe
+
+
 def list_probes(
     database: Database,
     *,

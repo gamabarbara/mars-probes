@@ -5,12 +5,13 @@ from fastapi import APIRouter, Query
 from api.schemas import (
     CommandsRequest,
     LaunchRequest,
+    ProbeDetailResponse,
     ProbeListQuery,
     ProbeListResponse,
     ProbeResponse,
 )
 from persistence.database import Database
-from probe_service import launch_probe, list_probes, move_probe
+from probe_service import get_probe, launch_probe, list_probes, move_probe
 
 
 def create_probe_query_router(database: Database) -> APIRouter:
@@ -28,6 +29,17 @@ def create_probe_query_router(database: Database) -> APIRouter:
         return ProbeListResponse(
             probes=[ProbeResponse.model_validate(probe) for probe in probes],
         )
+
+    return router
+
+
+def create_probe_detail_router(database: Database) -> APIRouter:
+    router = APIRouter()
+
+    @router.get("/{id}")
+    def get_by_id(id: str) -> ProbeDetailResponse:
+        probe = get_probe(database, probe_id=id)
+        return ProbeDetailResponse.model_validate(probe)
 
     return router
 
