@@ -42,7 +42,7 @@ export function MoveForm({ probeId, moving, onMovingChange, onMoved }) {
   }
 
   return (
-    <form className="mt-5 space-y-3 border-t border-slate-200 pt-4" aria-labelledby="move-title" onSubmit={handleSubmit}>
+    <form className="space-y-3 rounded-xl border border-slate-200 p-5" aria-labelledby="move-title" onSubmit={handleSubmit}>
       <h3 id="move-title" className="font-semibold">Move probe</h3>
       <p className="wrap-anywhere text-sm">ID: {probeId}</p>
       <label htmlFor="probe-commands" className="block text-sm font-medium">Commands</label>
@@ -55,7 +55,6 @@ export function MoveForm({ probeId, moving, onMovingChange, onMoved }) {
         aria-describedby="commands-help"
         autoCapitalize="off"
         spellCheck={false}
-        autoFocus
         disabled={moving}
       />
       <p id="commands-help" className="text-sm text-slate-600">

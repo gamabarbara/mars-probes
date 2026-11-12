@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vitest";
 
@@ -6,33 +6,215 @@ import { App } from "./App.jsx";
 
 afterEach(cleanup);
 
-const probe = { id: "new-probe", x: 0, y: 0, direction: "NORTH" };
+const first = { id: "probe-1", x: 0, y: 0, direction: "NORTH" };
+const second = { ...first, id: "probe-2", direction: "WEST" };
+const firstDetail = { ...first, max_x: 3, max_y: 5 };
+const secondDetail = { ...second, max_x: 7, max_y: 2 };
 
-test.each([true, false])("refreshes the list only on success (success: %s)", async (success) => {
-  const launchResponse = success
-    ? Response.json(probe, { status: 201 })
-    : Response.json({ message: "Could not launch the probe." }, { status: 503 });
-  const fetchMock = vi.fn()
-    .mockResolvedValueOnce(Response.json({ probes: [] }))
-    .mockResolvedValueOnce(launchResponse)
-    .mockResolvedValueOnce(Response.json({ probes: [probe] }));
+function mockApi(probes, handle = () => undefined) {
+  const fetchMock = vi.fn(async (url, options) => {
+    const response = handle(url, options);
+    if (response !== undefined) return response;
+    if (url === "/probes") return Response.json({ probes });
+    if (url.startsWith("/probes?")) {
+      const query = new URLSearchParams(url.split("?")[1]);
+      const offset = Number(query.get("offset"));
+      return Response.json({ probes: probes.slice(offset, offset + Number(query.get("limit"))) });
+    }
+    if (url === "/probes/probe-1") return Response.json(firstDetail);
+    if (url === "/probes/probe-2") return Response.json(secondDetail);
+    throw new Error("Unexpected request " + url);
+  });
   vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+function selectProbe(user, id) {
+  return user.click(screen.getByRole("button", { name: "Select probe " + id }));
+}
+
+test.each([true, false])("refreshes the table and map only after a successful launch (%s)", async (success) => {
+  const probes = [];
+  const fetchMock = mockApi(probes, (url, options) => {
+    if (url !== "/probes" || options?.method !== "POST") return;
+    if (!success) return Response.json({ message: "Could not launch the probe." }, { status: 503 });
+    probes.push(first);
+    return Response.json(first, { status: 201 });
+  });
   const user = userEvent.setup();
   render(<App />);
 
   await screen.findByText("No probes launched.");
+  expect(screen.getByText("No probes to display.")).toBeTruthy();
   await user.type(screen.getByRole("spinbutton", { name: "X limit" }), "5");
   await user.type(screen.getByRole("spinbutton", { name: "Y limit" }), "3");
   await user.click(screen.getByRole("button", { name: "Launch" }));
 
   if (success) {
     const table = await screen.findByRole("table");
-    expect(within(table).getByText(probe.id)).toBeTruthy();
+    expect(within(table).getByText(first.id)).toBeTruthy();
+    expect(await screen.findByText("Cell (0, 0): 1 probe")).toBeTruthy();
     expect(screen.getByText("Probe launched.")).toBeTruthy();
-    expect(fetchMock.mock.calls[2][0]).toBe(fetchMock.mock.calls[0][0]);
   } else {
     expect((await screen.findByRole("alert")).textContent).toBe("Could not launch the probe.");
     expect(screen.getByText("No probes launched.")).toBeTruthy();
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(screen.getByText("No probes to display.")).toBeTruthy();
   }
+
+  const reads = fetchMock.mock.calls.filter(([, options]) => options.method !== "POST");
+  expect(reads).toHaveLength(success ? 4 : 2);
+});
+
+test("maps probes from every page and keeps selection when paging or sorting", async () => {
+  const probes = [first, second, ...Array.from({ length: 18 }, (_, i) => ({
+    ...first, id: "additional-" + i, x: 2, y: 2,
+  })), { ...first, id: "last-probe", x: 8, y: 1 }];
+  const fetchMock = mockApi(probes);
+  const user = userEvent.setup();
+  render(<App />);
+
+  const table = await screen.findByRole("table");
+  expect(within(table).queryByText("last-probe")).toBeNull();
+  const overlap = await screen.findByText("Cell (0, 0): 2 probes");
+  expect(within(overlap.closest("[role=listitem]")).getByText("2")).toBeTruthy();
+  expect(screen.getByText("Cell (8, 1): 1 probe")).toBeTruthy();
+  expect(screen.getByText("Map bounds: (0, 0) to (8, 2)")).toBeTruthy();
+
+  await selectProbe(user, first.id);
+  expect(await screen.findByText("Cell (0, 0): 2 probes, selected probe facing North")).toBeTruthy();
+  expect(screen.getByText("Map bounds: (0, 0) to (8, 5)")).toBeTruthy();
+  expect(screen.getByText("(0, 0) to (3, 5)")).toBeTruthy();
+  expect(screen.getByRole("button", { name: "Select probe probe-1" }).getAttribute("aria-pressed")).toBe("true");
+
+  fetchMock.mockClear();
+  await user.click(screen.getByRole("button", { name: "Next" }));
+  expect(await screen.findByText("last-probe")).toBeTruthy();
+  await user.selectOptions(screen.getByLabelText("Sort by"), "x");
+  await screen.findByRole("button", { name: "Select probe probe-1" });
+  expect(screen.getByText("Cell (0, 0): 2 probes, selected probe facing North")).toBeTruthy();
+  expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+    "/probes?limit=21&offset=20&sort_by=id&order=asc",
+    "/probes?limit=21&offset=0&sort_by=x&order=asc",
+  ]);
+
+  await user.click(screen.getByRole("button", { name: "Clear selection" }));
+  expect(screen.getByText("Map bounds: (0, 0) to (8, 2)")).toBeTruthy();
+  expect(screen.queryByRole("form", { name: "Move probe" })).toBeNull();
+  expect(screen.getByText("Cell (0, 0): 2 probes")).toBeTruthy();
+});
+
+test("ignores detail responses superseded by another selection or by clearing it", async () => {
+  const pending = [];
+  mockApi([first, second], (url, { signal }) => {
+    if (url !== "/probes/probe-1") return;
+    return new Promise((resolve) => pending.push({ resolve, signal }));
+  });
+  const user = userEvent.setup();
+  render(<App />);
+
+  await screen.findByRole("table");
+  await selectProbe(user, first.id);
+  expect(screen.getByText("Loading selected probe…")).toBeTruthy();
+  await selectProbe(user, second.id);
+  expect(await screen.findByText("Cell (0, 0): 2 probes, selected probe facing West")).toBeTruthy();
+  expect(pending[0].signal.aborted).toBe(true);
+  await act(async () => pending[0].resolve(Response.json(firstDetail)));
+  expect(screen.getByText("(0, 0) to (7, 2)")).toBeTruthy();
+
+  await selectProbe(user, first.id);
+  expect(screen.getByText("Cell (0, 0): 2 probes")).toBeTruthy();
+  await user.click(screen.getByRole("button", { name: "Clear selection" }));
+  expect(pending[1].signal.aborted).toBe(true);
+  await act(async () => pending[1].resolve(Response.json(firstDetail)));
+  expect(screen.queryByRole("region", { name: "Selected probe" })).toBeNull();
+  expect(screen.getByText("Cell (0, 0): 2 probes")).toBeTruthy();
+});
+
+test("retries map and detail independently and keeps the overview after detail failure", async () => {
+  let mapReads = 0;
+  let detailReads = 0;
+  const fetchMock = mockApi([first, second], (url) => {
+    if (url === "/probes" && ++mapReads === 1) {
+      return Response.json({ message: "Map unavailable." }, { status: 503 });
+    }
+    if (url === "/probes/probe-1" && ++detailReads === 1) {
+      return Response.json({ message: "Probe not found." }, { status: 404 });
+    }
+  });
+  const user = userEvent.setup();
+  render(<App />);
+
+  expect(await screen.findByText("Map unavailable.")).toBeTruthy();
+  fetchMock.mockClear();
+  await user.click(screen.getByRole("button", { name: "Retry map" }));
+  expect(await screen.findByText("Cell (0, 0): 2 probes")).toBeTruthy();
+  expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(["/probes"]);
+
+  await selectProbe(user, second.id);
+  expect(await screen.findByText("Cell (0, 0): 2 probes, selected probe facing West")).toBeTruthy();
+  await selectProbe(user, first.id);
+  expect(await screen.findByText("Probe not found.")).toBeTruthy();
+  expect(screen.getByText("Cell (0, 0): 2 probes")).toBeTruthy();
+
+  fetchMock.mockClear();
+  await user.click(screen.getByRole("button", { name: "Retry detail" }));
+  expect(await screen.findByText("Cell (0, 0): 2 probes, selected probe facing North")).toBeTruthy();
+  expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(["/probes/probe-1"]);
+});
+
+test("refreshes the same page and highlights the confirmed position without double counting", async () => {
+  const probes = [first, second, ...Array.from({ length: 19 }, (_, i) => ({
+    ...first, id: "additional-" + i, x: 2, y: 2,
+  }))];
+  const moved = { ...first, x: 1, y: 1, direction: "EAST" };
+  let resolveMove;
+  let confirmed = false;
+  const fetchMock = mockApi(probes, (url, options) => {
+    if (url === "/probes/probe-1/commands") {
+      return new Promise((resolve) => { resolveMove = resolve; });
+    }
+    if (confirmed && url === "/probes/probe-1") return Response.json({ ...firstDetail, ...moved });
+    if (confirmed && url.startsWith("/probes?")) return Response.json({ probes: [probes.at(-1)] });
+  });
+  const user = userEvent.setup();
+  render(<App />);
+
+  await screen.findByRole("table");
+  await user.selectOptions(screen.getByLabelText("Sort by"), "x");
+  await screen.findByRole("table");
+  await selectProbe(user, first.id);
+  expect(await screen.findByText("Cell (0, 0): 2 probes, selected probe facing North")).toBeTruthy();
+  await user.click(screen.getByRole("button", { name: "Next" }));
+  await screen.findByRole("button", { name: "Select probe additional-18" });
+
+  fetchMock.mockClear();
+  const form = screen.getByRole("form", { name: "Move probe" });
+  const commands = within(form).getByRole("textbox", { name: "Commands" });
+  await user.type(commands, "MRM");
+  await user.click(within(form).getByRole("button", { name: "Send commands" }));
+  const pending = within(form).getByRole("button", { name: "Sending…" });
+  const switchProbe = screen.getByRole("button", { name: "Select probe additional-18" });
+  const clear = screen.getByRole("button", { name: "Clear selection" });
+  expect(pending.disabled && switchProbe.disabled && clear.disabled).toBe(true);
+  await user.click(pending);
+  await user.click(switchProbe);
+  expect(fetchMock).toHaveBeenCalledExactlyOnceWith("/probes/probe-1/commands", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ commands: "MRM" }),
+  });
+
+  confirmed = true;
+  await act(async () => resolveMove(Response.json(moved)));
+  expect(within(form).getByRole("status").textContent).toContain("Position: (1, 1) · Direction: East");
+  expect(within(form).getByText("ID: probe-1")).toBeTruthy();
+  expect(commands.value).toBe("");
+  expect(screen.getByText("Page 2")).toBeTruthy();
+  expect(await screen.findByText("Cell (1, 1): 1 probe, selected probe facing East")).toBeTruthy();
+  expect(screen.getByText("Cell (0, 0): 1 probe")).toBeTruthy();
+  expect(fetchMock.mock.calls.slice(1).map(([url]) => url).sort()).toEqual([
+    "/probes",
+    "/probes/probe-1",
+    "/probes?limit=21&offset=20&sort_by=x&order=asc",
+  ]);
 });
