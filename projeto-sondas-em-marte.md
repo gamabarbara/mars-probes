@@ -130,7 +130,7 @@ Cada avanço soma um deslocamento à posição atual. `NORTH` soma `(0, 1)`, `EA
 
 ### 4.3 Modelo de persistência
 
-O SQLAlchemy ORM mapeia a tabela em `backend/database_models.py`. O repositório usa sessões para gravar objetos e confirmar ou desfazer transações. A inicialização cria tabelas ausentes e preserva tabelas existentes. A estrutura é compatível com os arquivos SQLite da implementação anterior, permitindo voltar à versão anterior sem converter os dados. Mudanças futuras na estrutura exigem uma migração explícita.
+O SQLAlchemy ORM mapeia a tabela em `backend/persistence/models.py`. Para casos de uso que gravam dados, o serviço abre uma transação com `Database.transaction()` e passa a sessão ao repositório. O contexto confirma a transação ao concluir com sucesso ou desfaz as alterações em caso de erro. A inicialização cria tabelas ausentes e preserva tabelas existentes. A estrutura é compatível com os arquivos SQLite da implementação anterior, permitindo voltar à versão anterior sem converter os dados. Mudanças futuras na estrutura exigem uma migração explícita.
 
 A tabela `probes` representa uma sonda por linha. `id` é a chave primária. `x`, `y`, `max_x` e `max_y` são inteiros, e `direction` armazena o valor do enum como texto. Todos os campos são obrigatórios.
 
@@ -139,9 +139,9 @@ O banco protege as invariantes do registro com restrições de direção válida
 ### 4.4 Fluxo de movimento
 
 1. A rota valida o corpo inteiro e envia o ID e os comandos ao caso de uso.
-2. O caso de uso entra em `repository.transaction()` e carrega a sonda. O repositório SQLite executa `BEGIN IMMEDIATE` na conexão usada para a leitura e a gravação. Um ID desconhecido encerra a operação com `404`.
+2. O serviço entra em `database.transaction()`, que executa `BEGIN IMMEDIATE` antes de entregar a sessão. O repositório usa essa sessão para carregar a sonda. Um ID desconhecido encerra a operação com `404`.
 3. O domínio percorre os comandos em ordem. Se um avanço sair da malha, informa o passo que falhou. A transação é encerrada sem gravar e a rota responde `409`.
-4. Se todos os passos forem válidos, o repositório grava a posição e a direção finais e confirma a transação. A rota devolve `200` com o estado confirmado.
+4. Se todos os passos forem válidos, o repositório grava a posição e a direção finais na mesma sessão. O contexto confirma a transação, e a rota devolve `200` com o estado confirmado.
 
 No pytest, um teste de integração envia dois avanços simultâneos à mesma sonda, com espaço para ambos. Quando os dois pedidos têm sucesso, a posição final deve refletir os dois movimentos.
 
