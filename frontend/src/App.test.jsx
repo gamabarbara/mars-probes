@@ -11,7 +11,7 @@ const probe = { id: "sonda-nova", x: 0, y: 0, direction: "NORTH" };
 test.each([true, false])("refreshes the list only on success (success: %s)", async (success) => {
   const launchResponse = success
     ? Response.json(probe, { status: 201 })
-    : Response.json({ message: "Falha no lançamento." }, { status: 503 });
+    : Response.json({ message: "Could not launch the probe." }, { status: 503 });
   const fetchMock = vi.fn()
     .mockResolvedValueOnce(Response.json({ probes: [] }))
     .mockResolvedValueOnce(launchResponse)
@@ -31,7 +31,7 @@ test.each([true, false])("refreshes the list only on success (success: %s)", asy
     expect(screen.getByText("Sonda lançada.")).toBeTruthy();
     expect(fetchMock.mock.calls[2][0]).toBe(fetchMock.mock.calls[0][0]);
   } else {
-    expect((await screen.findByRole("alert")).textContent).toBe("Falha no lançamento.");
+    expect((await screen.findByRole("alert")).textContent).toBe("Could not launch the probe.");
     expect(screen.getByText("Nenhuma sonda lançada.")).toBeTruthy();
     expect(fetchMock).toHaveBeenCalledTimes(2);
   }

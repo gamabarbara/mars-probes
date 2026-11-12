@@ -32,7 +32,7 @@ test("launches a probe and shows the confirmed position", async () => {
 });
 
 test("shows the message returned by the API when launch fails", async () => {
-  const message = "O banco está ocupado. Tente novamente em instantes.";
+  const message = "The database is busy. Try again in a moment.";
   vi.stubGlobal(
     "fetch",
     vi.fn().mockResolvedValue(Response.json({ code: "DATABASE_BUSY", message }, { status: 503 })),
@@ -42,4 +42,16 @@ test("shows the message returned by the API when launch fails", async () => {
 
   expect((await screen.findByRole("alert")).textContent).toBe(message);
   expect(screen.queryByRole("status")).toBeNull();
+});
+
+test("shows grid validation in English and clears it when the value is corrected", async () => {
+  const user = userEvent.setup();
+  render(<LaunchForm />);
+  const x = screen.getByRole("spinbutton", { name: "Limite X" });
+
+  await user.click(screen.getByRole("button", { name: "Lançar" }));
+  expect(x.validationMessage).toBe("Enter a whole number from 0 to 100.");
+
+  await user.type(x, "5");
+  expect(x.validity.valid).toBe(true);
 });

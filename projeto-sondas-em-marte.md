@@ -76,7 +76,7 @@ Os corpos de requisição e resposta usam `application/json`. O `id` é um UUID 
 
 ### 3.1 Respostas de erro
 
-Erros retornam um objeto JSON com `code` para tratamento pelo React e `message` para exibição ao usuário. Em `OUT_OF_BOUNDS`, `step` indica a posição do comando que falhou, contando a partir de 1.
+Erros retornam um objeto JSON com `code` para tratamento pelo React e `message` em inglês para exibição ao usuário. Em `OUT_OF_BOUNDS`, `step` indica a posição do comando que falhou, contando a partir de 1.
 
 | HTTP | `code` | Quando ocorre |
 |---|---|---|
@@ -91,7 +91,7 @@ O tratador de `RequestValidationError` traduz `json_invalid` para `400 INVALID_J
 Por exemplo, após `MRM`, a sonda está em `(1, 1, EAST)`. Com limite `max_x = 5`, enviar `MMMMM` ultrapassaria a malha no quinto passo. A API retorna `409` e a sonda permanece em `(1, 1, EAST)`.
 
 ```json
-{"code":"OUT_OF_BOUNDS","message":"O comando no passo 5 ultrapassa os limites da malha.","step":5}
+{"code":"OUT_OF_BOUNDS","message":"The command at step 5 would move the probe outside the grid.","step":5}
 ```
 
 ## 4. Desenho da arquitetura

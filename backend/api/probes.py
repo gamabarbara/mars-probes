@@ -2,9 +2,15 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query
 
-from api.schemas import LaunchRequest, ProbeListQuery, ProbeListResponse, ProbeResponse
+from api.schemas import (
+    CommandsRequest,
+    LaunchRequest,
+    ProbeListQuery,
+    ProbeListResponse,
+    ProbeResponse,
+)
 from persistence.database import Database
-from probe_service import launch_probe, list_probes
+from probe_service import launch_probe, list_probes, move_probe
 
 
 def create_probe_query_router(database: Database) -> APIRouter:
@@ -34,6 +40,17 @@ def create_probe_launch_router(database: Database) -> APIRouter:
         probe = launch_probe(
             database, max_x=request.x, max_y=request.y, direction=request.direction
         )
+        return ProbeResponse.model_validate(probe)
+
+    return router
+
+
+def create_probe_commands_router(database: Database) -> APIRouter:
+    router = APIRouter()
+
+    @router.post("/{id}/commands")
+    def execute_commands(id: str, request: CommandsRequest) -> ProbeResponse:
+        probe = move_probe(database, probe_id=id, commands=request.commands)
         return ProbeResponse.model_validate(probe)
 
     return router

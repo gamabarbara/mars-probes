@@ -59,13 +59,13 @@ test("pages through results and resets the offset when sorting changes", async (
 
 test("shows an API error and retries the same query", async () => {
   const fetchMock = vi.fn()
-    .mockResolvedValueOnce(Response.json({ message: "Consulta indisponível." }, { status: 503 }))
+    .mockResolvedValueOnce(Response.json({ message: "Probe listing is unavailable." }, { status: 503 }))
     .mockResolvedValueOnce(Response.json({ probes: [probes[0]] }));
   vi.stubGlobal("fetch", fetchMock);
   const user = userEvent.setup();
   render(<ProbeList />);
 
-  expect((await screen.findByRole("alert")).textContent).toBe("Consulta indisponível.");
+  expect((await screen.findByRole("alert")).textContent).toBe("Probe listing is unavailable.");
   await user.click(screen.getByRole("button", { name: "Tentar novamente" }));
   expect(await screen.findByText("sonda-1")).toBeTruthy();
   expect(screen.queryByRole("alert")).toBeNull();

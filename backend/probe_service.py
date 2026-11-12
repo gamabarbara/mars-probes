@@ -5,6 +5,10 @@ from persistence.database import Database
 from persistence.repository import ProbeRepository
 
 
+class ProbeNotFoundError(Exception):
+    pass
+
+
 def list_probes(
     database: Database,
     *,
@@ -27,3 +31,14 @@ def launch_probe(
     with database.transaction() as session:
         ProbeRepository(session).insert(probe)
     return probe
+
+
+def move_probe(database: Database, *, probe_id: str, commands: str) -> Probe:
+    with database.transaction() as session:
+        repository = ProbeRepository(session)
+        probe = repository.get(probe_id)
+        if probe is None:
+            raise ProbeNotFoundError(probe_id)
+        moved_probe = probe.execute(commands)
+        repository.update_state(moved_probe)
+    return moved_probe

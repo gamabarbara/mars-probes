@@ -13,6 +13,12 @@ class LaunchRequest(BaseModel):
     direction: Direction
 
 
+class CommandsRequest(BaseModel):
+    commands: str = Field(
+        strict=True, min_length=1, max_length=1000, pattern=r"^[MLR]+$"
+    )
+
+
 class ProbeListQuery(BaseModel):
     limit: int | None = Field(default=None, ge=1, le=100)
     offset: int = Field(default=0, ge=0, le=2**63 - 1)

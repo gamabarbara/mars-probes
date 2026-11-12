@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from domain import Direction, Grid, Position, Probe, ProbeSortField
@@ -10,6 +10,15 @@ PROBE_SORT_COLUMNS = {
     ProbeSortField.Y: ProbeRecord.y,
     ProbeSortField.DIRECTION: ProbeRecord.direction,
 }
+
+
+def _to_probe(record: ProbeRecord) -> Probe:
+    return Probe(
+        id=record.id,
+        position=Position(x=record.x, y=record.y),
+        direction=Direction(record.direction),
+        grid=Grid(max_x=record.max_x, max_y=record.max_y),
+    )
 
 
 class ProbeRepository:
@@ -32,15 +41,20 @@ class ProbeRepository:
             query = query.order_by(ProbeRecord.id.asc())
 
         records = self.session.scalars(query.limit(limit).offset(offset))
-        return [
-            Probe(
-                id=record.id,
-                position=Position(x=record.x, y=record.y),
-                direction=Direction(record.direction),
-                grid=Grid(max_x=record.max_x, max_y=record.max_y),
+        return [_to_probe(record) for record in records]
+
+    def get(self, probe_id: str) -> Probe | None:
+        record = self.session.get(ProbeRecord, probe_id)
+        return _to_probe(record) if record is not None else None
+
+    def update_state(self, probe: Probe) -> None:
+        self.session.execute(
+            update(ProbeRecord)
+            .where(ProbeRecord.id == probe.id)
+            .values(
+                x=probe.position.x, y=probe.position.y, direction=probe.direction.value
             )
-            for record in records
-        ]
+        )
 
     def insert(self, probe: Probe) -> None:
         self.session.add(

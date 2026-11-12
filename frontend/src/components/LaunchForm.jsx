@@ -3,6 +3,14 @@ import { useState } from "react";
 import { directionLabels } from "../directionLabels.js";
 
 const fieldClass = "mt-1 w-full rounded-md border border-slate-400 bg-white px-3 py-2";
+const gridValidation = {
+  onInvalid(event) {
+    event.currentTarget.setCustomValidity("Enter a whole number from 0 to 100.");
+  },
+  onInput(event) {
+    event.currentTarget.setCustomValidity("");
+  },
+};
 
 export function LaunchForm({ onLaunched }) {
   const [launching, setLaunching] = useState(false);
@@ -28,13 +36,13 @@ export function LaunchForm({ onLaunched }) {
       });
       if (!response.ok) {
         const body = await response.json().catch(() => null);
-        setError(body?.message || "Não foi possível lançar a sonda. Tente novamente.");
+        setError(body?.message || "Could not launch the probe. Try again.");
         return;
       }
       setProbe(await response.json());
       onLaunched?.();
     } catch {
-      setError("Não foi possível conectar à API. Tente novamente.");
+      setError("Could not connect to the API. Try again.");
     } finally {
       setLaunching(false);
     }
@@ -50,11 +58,11 @@ export function LaunchForm({ onLaunched }) {
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block text-sm font-medium">
             Limite X
-            <input className={fieldClass} name="x" type="number" min="0" max="100" step="1" required aria-describedby="grid-help" />
+            <input className={fieldClass} name="x" type="number" min="0" max="100" step="1" required aria-describedby="grid-help" {...gridValidation} />
           </label>
           <label className="block text-sm font-medium">
             Limite Y
-            <input className={fieldClass} name="y" type="number" min="0" max="100" step="1" required aria-describedby="grid-help" />
+            <input className={fieldClass} name="y" type="number" min="0" max="100" step="1" required aria-describedby="grid-help" {...gridValidation} />
           </label>
         </div>
         <label className="block text-sm font-medium">
@@ -69,7 +77,7 @@ export function LaunchForm({ onLaunched }) {
           {launching ? "Lançando…" : "Lançar"}
         </button>
       </form>
-      {error && <p role="alert" className="mt-4 text-red-800">{error}</p>}
+      {error && <p lang="en" role="alert" className="mt-4 text-red-800">{error}</p>}
       {probe && (
         <div role="status" className="mt-4 rounded-md bg-emerald-50 p-4 text-emerald-950">
           <p className="font-semibold">Sonda lançada.</p>

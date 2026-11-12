@@ -32,7 +32,7 @@ export function ProbeList({ launchCount }) {
           if (!signal.aborted) {
             setResult({
               status: "error",
-              message: body?.message || "Não foi possível carregar as sondas.",
+              message: body?.message || "Could not load the probes.",
             });
           }
           return;
@@ -43,7 +43,7 @@ export function ProbeList({ launchCount }) {
         }
       } catch {
         if (!signal.aborted) {
-          setResult({ status: "error", message: "Não foi possível carregar as sondas." });
+          setResult({ status: "error", message: "Could not load the probes." });
         }
       }
     }
@@ -85,7 +85,7 @@ export function ProbeList({ launchCount }) {
       {status === "loading" && <p role="status">Carregando sondas…</p>}
       {status === "error" && (
         <div className="space-y-2">
-          <p role="alert" className="text-red-800">{message}</p>
+          <p lang="en" role="alert" className="text-red-800">{message}</p>
           <button type="button" className={buttonClass} onClick={() => setRetryCount((count) => count + 1)}>
             Tentar novamente
           </button>

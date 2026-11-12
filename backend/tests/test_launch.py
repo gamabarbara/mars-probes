@@ -86,7 +86,7 @@ def test_launch_rejects_malformed_json(tmp_path: Path) -> None:
     assert response.status_code == 400
     assert response.json() == {
         "code": "INVALID_JSON",
-        "message": "O JSON enviado é inválido.",
+        "message": "The request body contains invalid JSON.",
     }
 
 
