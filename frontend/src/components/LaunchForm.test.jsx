@@ -8,10 +8,10 @@ afterEach(cleanup);
 async function submitLaunch() {
   const user = userEvent.setup();
   render(<LaunchForm />);
-  await user.type(screen.getByRole("spinbutton", { name: "Limite X" }), "5");
-  await user.type(screen.getByRole("spinbutton", { name: "Limite Y" }), "0");
-  await user.selectOptions(screen.getByLabelText("Direção inicial"), "EAST");
-  await user.click(screen.getByRole("button", { name: "Lançar" }));
+  await user.type(screen.getByRole("spinbutton", { name: "X limit" }), "5");
+  await user.type(screen.getByRole("spinbutton", { name: "Y limit" }), "0");
+  await user.selectOptions(screen.getByLabelText("Initial direction"), "EAST");
+  await user.click(screen.getByRole("button", { name: "Launch" }));
 }
 
 test("launches a probe and shows the confirmed position", async () => {
@@ -28,7 +28,7 @@ test("launches a probe and shows the confirmed position", async () => {
   });
   const status = await screen.findByRole("status");
   expect(within(status).getByText(`ID: ${probe.id}`)).toBeTruthy();
-  expect(within(status).getByText("Posição: (0, 0) · Direção: Leste")).toBeTruthy();
+  expect(within(status).getByText("Position: (0, 0) · Direction: East")).toBeTruthy();
 });
 
 test("shows the message returned by the API when launch fails", async () => {
@@ -47,9 +47,9 @@ test("shows the message returned by the API when launch fails", async () => {
 test("shows grid validation in English and clears it when the value is corrected", async () => {
   const user = userEvent.setup();
   render(<LaunchForm />);
-  const x = screen.getByRole("spinbutton", { name: "Limite X" });
+  const x = screen.getByRole("spinbutton", { name: "X limit" });
 
-  await user.click(screen.getByRole("button", { name: "Lançar" }));
+  await user.click(screen.getByRole("button", { name: "Launch" }));
   expect(x.validationMessage).toBe("Enter a whole number from 0 to 100.");
 
   await user.type(x, "5");

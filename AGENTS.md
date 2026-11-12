@@ -23,7 +23,7 @@
 - `backend/persistence/database.py` configures SQLite and owns transaction contexts. `backend/persistence/repository.py` executes persistence operations using the session supplied by the service. `backend/persistence/models.py` maps SQLite tables and constraints. Keep ORM models separate from domain models.
 - `frontend/src/main.jsx` mounts React. `frontend/src/App.jsx` composes the application UI.
 - `frontend/src/components/LaunchForm.jsx` handles form input and UI state. Send requests through the relative API path configured in `frontend/vite.config.js`. The backend enforces domain rules.
-- Keep code identifiers and error messages in English. Use Brazilian Portuguese for other user-facing copy.
+- Keep code identifiers, error messages, and all frontend copy in English.
 
 ## Run and verify
 

@@ -1,6 +1,6 @@
 export const directionLabels = {
-  NORTH: "Norte",
-  EAST: "Leste",
-  SOUTH: "Sul",
-  WEST: "Oeste",
+  NORTH: "North",
+  EAST: "East",
+  SOUTH: "South",
+  WEST: "West",
 };

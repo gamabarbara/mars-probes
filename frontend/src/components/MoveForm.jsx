@@ -1,0 +1,79 @@
+import { useState } from "react";
+
+import { directionLabels } from "../directionLabels.js";
+
+export function MoveForm({ probeId, moving, onMovingChange, onMoved }) {
+  const [commands, setCommands] = useState("");
+  const [error, setError] = useState(null);
+  const [position, setPosition] = useState(null);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    if (moving) return;
+
+    setError(null);
+    setPosition(null);
+    if (commands.length < 1 || commands.length > 1000 || /[^LRM]/.test(commands)) {
+      setError("Enter 1 to 1000 commands using only uppercase L, R, and M.");
+      return;
+    }
+
+    onMovingChange(true);
+    try {
+      const response = await fetch(`/probes/${encodeURIComponent(probeId)}/commands`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ commands }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        setError(body?.message || "Could not move the probe.");
+        return;
+      }
+
+      setPosition(await response.json());
+      setCommands("");
+      onMoved();
+    } catch {
+      setError("Could not confirm whether the probe moved.");
+    } finally {
+      onMovingChange(false);
+    }
+  }
+
+  return (
+    <form className="mt-5 space-y-3 border-t border-slate-200 pt-4" aria-labelledby="move-title" onSubmit={handleSubmit}>
+      <h3 id="move-title" className="font-semibold">Move probe</h3>
+      <p className="wrap-anywhere text-sm">ID: {probeId}</p>
+      <label htmlFor="probe-commands" className="block text-sm font-medium">Commands</label>
+      <textarea
+        id="probe-commands"
+        className="w-full rounded-md border border-slate-400 bg-white px-3 py-2"
+        rows={2}
+        value={commands}
+        onChange={(event) => setCommands(event.target.value)}
+        aria-describedby="commands-help"
+        autoCapitalize="off"
+        spellCheck={false}
+        autoFocus
+        disabled={moving}
+      />
+      <p id="commands-help" className="text-sm text-slate-600">
+        Enter 1 to 1000 uppercase commands without spaces. L turns left, R turns right, and M moves forward.
+      </p>
+      <button
+        type="submit"
+        disabled={moving}
+        className="rounded-md bg-slate-900 px-4 py-2 font-semibold text-white disabled:opacity-60"
+      >
+        {moving ? "Sending…" : "Send commands"}
+      </button>
+      {error && <p lang="en" role="alert" className="text-red-800">{error}</p>}
+      {position && (
+        <p role="status" className="rounded-md bg-emerald-50 p-3 text-emerald-950">
+          Move confirmed. Position: ({position.x}, {position.y}) · Direction: {directionLabels[position.direction]}
+        </p>
+      )}
+    </form>
+  );
+}

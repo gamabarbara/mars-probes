@@ -50,23 +50,23 @@ export function LaunchForm({ onLaunched }) {
 
   return (
     <section className="rounded-xl border border-slate-200 p-5" aria-labelledby="launch-title">
-      <h2 id="launch-title" className="text-xl font-semibold">Lançar sonda</h2>
+      <h2 id="launch-title" className="text-xl font-semibold">Launch probe</h2>
       <p id="grid-help" className="mt-1 text-sm text-slate-600">
-        Defina os limites da malha com números inteiros de 0 a 100.
+        Set the grid limits using whole numbers from 0 to 100.
       </p>
       <form className="mt-4 space-y-4" onSubmit={handleSubmit}>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="block text-sm font-medium">
-            Limite X
+            X limit
             <input className={fieldClass} name="x" type="number" min="0" max="100" step="1" required aria-describedby="grid-help" {...gridValidation} />
           </label>
           <label className="block text-sm font-medium">
-            Limite Y
+            Y limit
             <input className={fieldClass} name="y" type="number" min="0" max="100" step="1" required aria-describedby="grid-help" {...gridValidation} />
           </label>
         </div>
         <label className="block text-sm font-medium">
-          Direção inicial
+          Initial direction
           <select className={fieldClass} name="direction" defaultValue="NORTH">
             {Object.entries(directionLabels).map(([value, label]) => (
               <option key={value} value={value}>{label}</option>
@@ -74,15 +74,15 @@ export function LaunchForm({ onLaunched }) {
           </select>
         </label>
         <button type="submit" disabled={launching} className="rounded-md bg-slate-900 px-4 py-2 font-semibold text-white disabled:opacity-60">
-          {launching ? "Lançando…" : "Lançar"}
+          {launching ? "Launching…" : "Launch"}
         </button>
       </form>
       {error && <p lang="en" role="alert" className="mt-4 text-red-800">{error}</p>}
       {probe && (
         <div role="status" className="mt-4 rounded-md bg-emerald-50 p-4 text-emerald-950">
-          <p className="font-semibold">Sonda lançada.</p>
+          <p className="font-semibold">Probe launched.</p>
           <p className="break-all">ID: {probe.id}</p>
-          <p>Posição: ({probe.x}, {probe.y}) · Direção: {directionLabels[probe.direction]}</p>
+          <p>Position: ({probe.x}, {probe.y}) · Direction: {directionLabels[probe.direction]}</p>
         </div>
       )}
     </section>

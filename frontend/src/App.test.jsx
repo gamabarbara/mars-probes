@@ -6,7 +6,7 @@ import { App } from "./App.jsx";
 
 afterEach(cleanup);
 
-const probe = { id: "sonda-nova", x: 0, y: 0, direction: "NORTH" };
+const probe = { id: "new-probe", x: 0, y: 0, direction: "NORTH" };
 
 test.each([true, false])("refreshes the list only on success (success: %s)", async (success) => {
   const launchResponse = success
@@ -20,19 +20,19 @@ test.each([true, false])("refreshes the list only on success (success: %s)", asy
   const user = userEvent.setup();
   render(<App />);
 
-  await screen.findByText("Nenhuma sonda lançada.");
-  await user.type(screen.getByRole("spinbutton", { name: "Limite X" }), "5");
-  await user.type(screen.getByRole("spinbutton", { name: "Limite Y" }), "3");
-  await user.click(screen.getByRole("button", { name: "Lançar" }));
+  await screen.findByText("No probes launched.");
+  await user.type(screen.getByRole("spinbutton", { name: "X limit" }), "5");
+  await user.type(screen.getByRole("spinbutton", { name: "Y limit" }), "3");
+  await user.click(screen.getByRole("button", { name: "Launch" }));
 
   if (success) {
     const table = await screen.findByRole("table");
     expect(within(table).getByText(probe.id)).toBeTruthy();
-    expect(screen.getByText("Sonda lançada.")).toBeTruthy();
+    expect(screen.getByText("Probe launched.")).toBeTruthy();
     expect(fetchMock.mock.calls[2][0]).toBe(fetchMock.mock.calls[0][0]);
   } else {
     expect((await screen.findByRole("alert")).textContent).toBe("Could not launch the probe.");
-    expect(screen.getByText("Nenhuma sonda lançada.")).toBeTruthy();
+    expect(screen.getByText("No probes launched.")).toBeTruthy();
     expect(fetchMock).toHaveBeenCalledTimes(2);
   }
 });
