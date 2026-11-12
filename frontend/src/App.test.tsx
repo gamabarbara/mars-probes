@@ -5,10 +5,7 @@ import { afterEach, expect, test, vi } from "vitest";
 import { App } from "./App";
 import type { Probe } from "./probeTypes";
 
-afterEach(() => {
-  cleanup();
-  sessionStorage.clear();
-});
+afterEach(cleanup);
 
 const first: Probe = { id: "probe-1", x: 0, y: 0, direction: "NORTH" };
 const second: Probe = { ...first, id: "probe-2", direction: "WEST" };
@@ -238,7 +235,7 @@ test("refreshes the same page and highlights the confirmed position without doub
   await user.click(switchProbe);
   expect(fetchMock).toHaveBeenCalledExactlyOnceWith("/probes/probe-1/commands", {
     method: "POST",
-    headers: { "Content-Type": "application/json", "Idempotency-Key": expect.any(String) },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ commands: "MRM" }),
   });
 
@@ -257,30 +254,18 @@ test("refreshes the same page and highlights the confirmed position without doub
   ]);
 });
 
-test("refreshes after a lost move response and retries the same move after remount", async () => {
+test("refreshes after a lost move response and clears the submitted commands", async () => {
   const probes = [first];
-  const confirmedMoves = new Map();
-  let resolveDetail: ((response: Response) => void) | undefined;
   const fetchMock = mockApi(probes, (url, options) => {
     if (url === "/probes/probe-1") {
-      if (probes[0].y === 1 && !resolveDetail) {
-        return new Promise<Response>((resolve) => { resolveDetail = resolve; });
-      }
       return Response.json({ ...firstDetail, ...probes[0] });
     }
     if (url !== "/probes/probe-1/commands" || options?.method !== "POST") return;
-
-    const key = options.headers?.["Idempotency-Key"];
-    if (!key) throw new Error("Missing idempotency key");
-    if (confirmedMoves.has(key)) return Response.json(confirmedMoves.get(key));
-    const moved = { ...probes[0], y: probes[0].y + 1 };
-    probes[0] = moved;
-    confirmedMoves.set(key, moved);
-    if (moved.y === 1) throw new TypeError("Failed to fetch");
-    return Response.json(moved);
+    probes[0] = { ...probes[0], y: 1 };
+    throw new TypeError("Failed to fetch");
   });
   const user = userEvent.setup();
-  const { unmount } = render(<App />);
+  render(<App />);
 
   await screen.findByRole("table");
   await selectProbe(user, first.id);
@@ -291,39 +276,9 @@ test("refreshes after a lost move response and retries the same move after remou
   await user.click(within(form).getByRole("button", { name: "Send commands" }));
 
   expect((await within(form).findByRole("alert")).textContent).toBe("Could not confirm whether the probe moved.");
-  expect(within(form).getByRole("button", { name: "Retry move" }).matches(":disabled")).toBe(true);
-  expect(commands.disabled).toBe(true);
-  const completeDetail = resolveDetail;
-  if (!completeDetail) throw new Error("Expected a pending detail request");
-  await act(async () => completeDetail(Response.json({ ...firstDetail, ...probes[0] })));
   await screen.findByText("Cell (0, 1): 1 probe, selected probe facing North");
-  expect(within(form).getByRole("button", { name: "Retry move" }).matches(":disabled")).toBe(false);
-
-  unmount();
-  render(<App />);
-  await screen.findByRole("table");
-  await selectProbe(user, first.id);
-  await screen.findByText("Cell (0, 1): 1 probe, selected probe facing North");
-  const restoredForm = screen.getByRole("form", { name: "Move probe" });
-  const restoredCommands = within(restoredForm).getByRole<HTMLTextAreaElement>("textbox", { name: "Commands" });
-  expect(restoredCommands.value).toBe("M");
-  await user.click(within(restoredForm).getByRole("button", { name: "Retry move" }));
-  expect((await within(restoredForm).findByRole("status")).textContent).toContain("Position: (0, 1)");
-  await screen.findByText("Cell (0, 1): 1 probe, selected probe facing North");
-  expect(restoredCommands.value).toBe("");
-
-  await user.type(restoredCommands, "M");
-  await user.click(within(restoredForm).getByRole("button", { name: "Send commands" }));
-  expect(await screen.findByText("Cell (0, 2): 1 probe, selected probe facing North")).toBeTruthy();
-  const attempts = fetchMock.mock.calls
-    .filter(([url, options]) => url === "/probes/probe-1/commands" && options?.method === "POST")
-    .map(([, options]) => ({
-      key: options.headers?.["Idempotency-Key"],
-      commands: JSON.parse(String(options.body)).commands,
-    }));
-  expect(attempts.map(({ commands }) => commands)).toEqual(["M", "M", "M"]);
-  expect(attempts[0].key).toEqual(expect.any(String));
-  expect(attempts[1]).toEqual(attempts[0]);
-  expect(attempts[2].key).toEqual(expect.any(String));
-  expect(attempts[2].key).not.toBe(attempts[0].key);
+  expect(commands.value).toBe("");
+  expect(commands.disabled).toBe(false);
+  expect(within(form).getByRole("button", { name: "Send commands" }).matches(":disabled")).toBe(false);
+  expect(fetchMock.mock.calls.filter(([, options]) => options?.method === "POST")).toHaveLength(1);
 });

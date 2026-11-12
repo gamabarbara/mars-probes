@@ -5,7 +5,7 @@ from pathlib import Path
 
 from sqlalchemy import URL, create_engine
 from sqlalchemy.exc import OperationalError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import NullPool
 
 from persistence.models import Base
@@ -24,24 +24,23 @@ class Database:
             URL.create("sqlite+pysqlite", database=str(database_path)),
             connect_args={
                 "timeout": WRITE_TIMEOUT_SECONDS,
+                # Start the SQLite write transaction at the first write statement.
                 "autocommit": sqlite3.LEGACY_TRANSACTION_CONTROL,
             },
             poolclass=NullPool,
         )
+        self._sessions = sessionmaker(self.engine)
 
     def initialize(self) -> None:
         Base.metadata.create_all(self.engine)
 
-    @contextmanager
-    def read_session(self) -> Iterator[Session]:
-        with Session(self.engine) as session:
-            yield session
+    def read_session(self) -> Session:
+        return self._sessions()
 
     @contextmanager
     def transaction(self) -> Iterator[Session]:
         try:
-            with Session(self.engine) as session, session.begin():
-                session.connection().exec_driver_sql("BEGIN IMMEDIATE")
+            with self._sessions.begin() as session:
                 yield session
         except OperationalError as error:
             cause = error.orig

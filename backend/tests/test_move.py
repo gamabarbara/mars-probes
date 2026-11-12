@@ -2,15 +2,17 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import closing
 from pathlib import Path
 from sqlite3 import connect
-from threading import Barrier
-from uuid import uuid4
+from threading import Barrier, Event
 
 import pytest
 from fastapi.testclient import TestClient
 from httpx import Response
 
+import probe_service
+from domain import Probe
 from main import create_app
 from persistence import database as database_module
+from persistence.repository import ProbeRepository
 
 
 def launch(client: TestClient, x: int = 5, y: int = 5) -> dict[str, str | int]:
@@ -120,10 +122,8 @@ def test_move_accepts_one_thousand_commands(tmp_path: Path) -> None:
     assert response.json() == probe
 
 
-@pytest.mark.parametrize("same_key", [False, True])
-def test_concurrent_moves_on_same_probe(tmp_path: Path, same_key: bool) -> None:
+def test_concurrent_moves_on_same_probe(tmp_path: Path) -> None:
     ready = Barrier(2, timeout=5)
-    headers = {"Idempotency-Key": str(uuid4())} if same_key else {}
     with TestClient(create_app(tmp_path / "probes.sqlite3")) as client:
         probe = launch(client, x=0, y=2)
 
@@ -132,7 +132,6 @@ def test_concurrent_moves_on_same_probe(tmp_path: Path, same_key: bool) -> None:
             return client.post(
                 f"/probes/{probe['id']}/commands",
                 json={"commands": "M"},
-                headers=headers,
             )
 
         with ThreadPoolExecutor(max_workers=2) as workers:
@@ -140,62 +139,45 @@ def test_concurrent_moves_on_same_probe(tmp_path: Path, same_key: bool) -> None:
             responses = [first.result(), second.result()]
 
         assert [response.status_code for response in responses] == [200, 200]
-        expected_y = 1 if same_key else 2
-        assert sorted(response.json()["y"] for response in responses) == [1, expected_y]
-        assert client.get("/probes").json() == {"probes": [{**probe, "y": expected_y}]}
+        assert sorted(response.json()["y"] for response in responses) == [1, 2]
+        assert client.get("/probes").json() == {"probes": [{**probe, "y": 2}]}
 
 
-def test_move_replays_original_result_after_restart_and_later_move(
-    tmp_path: Path,
+def test_move_reports_timeout_waiting_for_another_move(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    database = tmp_path / "probes.sqlite3"
-    key = "550e8400-e29b-41d4-a716-446655440000"
-    headers = {"Idempotency-Key": key}
-    retry_headers = {"Idempotency-Key": key.upper()}
-    with TestClient(create_app(database)) as client:
-        probe = launch(client)
+    first_read = Event()
+    resume = Event()
+    original_get = ProbeRepository.get
+
+    def pause_after_first_read(
+        repository: ProbeRepository, probe_id: str
+    ) -> Probe | None:
+        probe = original_get(repository, probe_id)
+        if not first_read.is_set():
+            first_read.set()
+            assert resume.wait(timeout=5)
+        return probe
+
+    monkeypatch.setattr(ProbeRepository, "get", pause_after_first_read)
+    monkeypatch.setattr(probe_service, "MOVE_LOCK_TIMEOUT_SECONDS", 0)
+    with (
+        TestClient(create_app(tmp_path / "probes.sqlite3")) as client,
+        ThreadPoolExecutor(max_workers=1) as worker,
+    ):
+        probe = launch(client, x=0, y=2)
         url = f"/probes/{probe['id']}/commands"
-        first = client.post(url, json={"commands": "M"}, headers=headers)
-        assert first.status_code == 200
-        assert first.json() == {**probe, "y": 1}
+        first = worker.submit(client.post, url, json={"commands": "M"})
+        try:
+            assert first_read.wait(timeout=5)
+            blocked = client.post(url, json={"commands": "M"})
+            assert blocked.status_code == 503
+            assert blocked.json()["code"] == "DATABASE_BUSY"
+        finally:
+            resume.set()
 
-    with TestClient(create_app(database)) as client:
-        retry = client.post(url, json={"commands": "M"}, headers=retry_headers)
-        assert retry.status_code == 200
-        assert retry.json() == first.json()
-        assert client.get("/probes").json() == {"probes": [first.json()]}
-
-        later = client.post(
-            url, json={"commands": "MR"}, headers={"Idempotency-Key": str(uuid4())}
-        )
-        assert later.status_code == 200
-        assert later.json() == {**probe, "y": 2, "direction": "EAST"}
-        replay = client.post(url, json={"commands": "M"}, headers=headers)
-        assert replay.status_code == 200
-        assert replay.json() == first.json()
-
-        conflict = client.post(url, json={"commands": "R"}, headers=headers)
-        assert conflict.status_code == 409
-        assert conflict.json()["code"] == "IDEMPOTENCY_CONFLICT"
-        assert client.get("/probes").json() == {"probes": [later.json()]}
-
-
-def test_move_only_records_confirmed_commands(tmp_path: Path) -> None:
-    with TestClient(create_app(tmp_path / "probes.sqlite3")) as client:
-        probe = launch(client, x=0)
-        url = f"/probes/{probe['id']}/commands"
-        invalid = client.post(
-            url, json={"commands": "M"}, headers={"Idempotency-Key": "invalid"}
-        )
-        assert invalid.status_code == 422
-        assert invalid.json()["code"] == "INVALID_INPUT"
-        headers = {"Idempotency-Key": str(uuid4())}
-        rejected = client.post(url, json={"commands": "RM"}, headers=headers)
-        assert rejected.status_code == 409
-        assert rejected.json()["code"] == "OUT_OF_BOUNDS"
-        confirmed = client.post(url, json={"commands": "M"}, headers=headers)
-        assert confirmed.status_code == 200
-        assert confirmed.json() == {**probe, "y": 1}
+        assert first.result(timeout=5).status_code == 200
+        assert client.get("/probes").json() == {"probes": [{**probe, "y": 1}]}
 
 
 def test_move_reports_locked_database_without_changing_the_probe(
@@ -205,15 +187,15 @@ def test_move_reports_locked_database_without_changing_the_probe(
     monkeypatch.setattr(database_module, "WRITE_TIMEOUT_SECONDS", 0)
     with TestClient(create_app(database)) as client:
         probe = launch(client)
+        url = f"/probes/{probe['id']}/commands"
         with closing(connect(database)) as writer:
             writer.execute("BEGIN IMMEDIATE")
-            response = client.post(
-                f"/probes/{probe['id']}/commands", json={"commands": "M"}
-            )
+            response = client.post(url, json={"commands": "M"})
 
         assert response.status_code == 503
         assert response.json()["code"] == "DATABASE_BUSY"
         assert client.get("/probes").json() == {"probes": [probe]}
+        assert client.post(url, json={"commands": "M"}).status_code == 200
 
 
 def test_move_documents_its_request_and_responses(tmp_path: Path) -> None:
@@ -221,10 +203,7 @@ def test_move_documents_its_request_and_responses(tmp_path: Path) -> None:
         schema = client.get("/openapi.json").json()
 
     move = schema["paths"]["/probes/{id}/commands"]["post"]
-    key = next(p for p in move["parameters"] if p["in"] == "header")
-    assert key["name"] == "Idempotency-Key"
-    assert key["required"] is False
-    assert {"type": "string", "format": "uuid"} in key["schema"]["anyOf"]
+    assert [(p["in"], p["name"]) for p in move["parameters"]] == [("path", "id")]
     assert move["requestBody"]["required"] is True
     assert move["requestBody"]["content"]["application/json"]["schema"] == {
         "$ref": "#/components/schemas/CommandsRequest"
@@ -243,24 +222,16 @@ def test_move_documents_its_request_and_responses(tmp_path: Path) -> None:
         ("200", "ProbeResponse"),
         ("400", "ErrorResponse"),
         ("404", "ErrorResponse"),
+        ("409", "OutOfBoundsResponse"),
         ("422", "ErrorResponse"),
         ("503", "ErrorResponse"),
     ):
         assert move["responses"][status]["content"]["application/json"]["schema"] == {
             "$ref": f"#/components/schemas/{model}"
         }
-    conflict_schema = move["responses"]["409"]["content"]["application/json"]["schema"]
-    assert {option["$ref"] for option in conflict_schema["anyOf"]} == {
-        "#/components/schemas/OutOfBoundsResponse",
-        "#/components/schemas/IdempotencyConflictResponse",
-    }
     error_fields = schema["components"]["schemas"]["OutOfBoundsResponse"]["properties"]
     assert error_fields["code"]["const"] == "OUT_OF_BOUNDS"
     assert error_fields["step"]["type"] == "integer"
-    idempotency_fields = schema["components"]["schemas"]["IdempotencyConflictResponse"][
-        "properties"
-    ]
-    assert idempotency_fields["code"]["const"] == "IDEMPOTENCY_CONFLICT"
     assert set(schema["paths"]["/probes"]["post"]["responses"]) == {
         "201",
         "400",

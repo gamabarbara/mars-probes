@@ -26,19 +26,3 @@ class ProbeRecord(Base):
         CheckConstraint(direction.in_([item.value for item in Direction])),
         {"sqlite_strict": True},
     )
-
-
-class ConfirmedMoveRecord(Base):
-    __tablename__ = "confirmed_moves"
-
-    probe_id: Mapped[str] = mapped_column(Text, primary_key=True)
-    key: Mapped[str] = mapped_column(Text, primary_key=True)
-    commands: Mapped[str] = mapped_column(Text)
-    x: Mapped[int] = mapped_column()
-    y: Mapped[int] = mapped_column()
-    direction: Mapped[str] = mapped_column(Text)
-
-    __table_args__ = (
-        CheckConstraint(direction.in_([item.value for item in Direction])),
-        {"sqlite_strict": True},
-    )

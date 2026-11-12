@@ -63,7 +63,6 @@ export function App() {
                 probeId={selectedId}
                 moving={moving}
                 onMovingChange={setMoving}
-                detailLoading={detail.status === "loading"}
                 onRefresh={() => setMoveRevision((revision) => revision + 1)}
               />
             )}

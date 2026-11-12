@@ -30,7 +30,7 @@ def test_transaction_rolls_back_flushed_changes(tmp_path: Path) -> None:
         assert session.get(ProbeRecord, "first") is None
 
 
-def test_transaction_acquires_write_lock_before_use_case(
+def test_transaction_reports_busy_database_on_write(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(database_module, "WRITE_TIMEOUT_SECONDS", 0)
@@ -39,6 +39,8 @@ def test_transaction_acquires_write_lock_before_use_case(
     database.initialize()
 
     with closing(connect(path)) as writer:
-        writer.execute("BEGIN IMMEDIATE")
-        with pytest.raises(DatabaseBusyError), database.transaction():
-            pytest.fail("The use case must not start without the write lock.")
+        writer.execute("UPDATE probes SET x = x")
+        with pytest.raises(DatabaseBusyError), database.transaction() as session:
+            ProbeRepository(session).insert(
+                Probe.at_origin("first", Grid(5, 5), Direction.NORTH)
+            )

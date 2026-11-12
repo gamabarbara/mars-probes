@@ -1,12 +1,10 @@
 from http import HTTPStatus
 from typing import Annotated
-from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
 
 from api.error_handlers import (
     ErrorResponse,
-    IdempotencyConflictResponse,
     OutOfBoundsResponse,
 )
 from api.schemas import (
@@ -88,25 +86,12 @@ def launch(request: LaunchRequest, service: ProbeServiceDependency) -> Probe:
     responses={
         404: PROBE_NOT_FOUND,
         409: {
-            "model": OutOfBoundsResponse | IdempotencyConflictResponse,
-            "description": "Command exceeds grid bounds or move key conflicts",
+            "model": OutOfBoundsResponse,
+            "description": "Command exceeds grid bounds",
         },
     },
 )
 def execute_commands(
-    id: str,
-    request: CommandsRequest,
-    service: ProbeServiceDependency,
-    idempotency_key: Annotated[
-        UUID | None,
-        Header(
-            alias="Idempotency-Key",
-            description="Reuse the same key and commands when retrying a move.",
-        ),
-    ] = None,
+    id: str, request: CommandsRequest, service: ProbeServiceDependency
 ) -> Probe:
-    return service.move_probe(
-        probe_id=id,
-        commands=request.commands,
-        idempotency_key=idempotency_key,
-    )
+    return service.move_probe(probe_id=id, commands=request.commands)

@@ -64,7 +64,7 @@ curl --fail-with-body 'http://localhost:8000/probes/<id>/commands' \
 curl --fail-with-body 'http://localhost:8000/probes/<id>'
 ```
 
-Em caso de falha, use o campo `code` para identificar o erro. Por exemplo, `422 INVALID_INPUT` indica entrada inválida e `409 OUT_OF_BOUNDS` indica que um passo sairia da malha. Para repetir um movimento após perder a resposta, envie desde a primeira tentativa um UUID no cabeçalho `Idempotency-Key`. Repita a mesma chave e os mesmos comandos para a mesma sonda.
+Em caso de falha, use o campo `code` para identificar o erro. Por exemplo, `422 INVALID_INPUT` indica entrada inválida e `409 OUT_OF_BOUNDS` indica que um passo sairia da malha.
 
 [Contrato completo da API, com paginação, ordenação e erros](projeto-sondas-em-marte.md#3-contrato-da-api)
 

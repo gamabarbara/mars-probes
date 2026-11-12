@@ -47,7 +47,7 @@
 | **UUID v4 gerado no lançamento** | `launch_probe()` gera o ID antes da inserção. A chave primária protege a unicidade. | Um inteiro autoincrementado deixa a geração da identidade a cargo do banco. |
 | **FastAPI e arquitetura em camadas** | FastAPI cuida da validação HTTP e do OpenAPI. Apresentação, negócio e persistência têm responsabilidades próprias. O domínio pode ser testado em Python isoladamente. | Arquitetura hexagonal com portas explícitas. Útil se houver necessidade de substituir ou manter vários adaptadores. |
 | **SQLite em arquivo** | Uma tabela `probes` guarda o estado e os limites. Um volume do Compose preserva o arquivo após reinício (RNF05). | Memória com lock atenderia à concorrência em um processo. O estado seria perdido ao reiniciar a API. |
-| **Movimento atômico e transação de escrita antecipada** | O repositório SQLite usa `BEGIN IMMEDIATE` antes da leitura. Cada pedido confirmado parte do último estado gravado. A simulação grava só o resultado final. A espera limitada pode resultar em `503` (RN05 e RNF06). | Transação iniciada apenas na gravação. Dois pedidos poderiam calcular a partir da mesma posição. |
+| **Movimento atômico com bloqueio no serviço** | O backend roda em uma instância com um worker. Um `threading.Lock` serializa os movimentos da leitura ao commit. Cada movimento grava só o resultado final (RN05 e RNF06). | Uma atualização condicional no banco permitiria coordenar vários workers. |
 | **Consulta por ID depois dos três endpoints do desafio** | `GET /probes` mantém o formato do enunciado. `GET /probes/{id}` fornece os limites quando o React seleciona uma sonda (RF03, RF05 e RF08). | Acrescentar os limites a cada item da listagem mudaria a resposta documentada. |
 | **Mapa com área de exibição calculada** | Enquadra todas as posições e a malha selecionada. A listagem e um único detalhe bastam para desenhar o mapa (seção 4.5). | Exibir todas as malhas completas exigiria obter os limites de cada sonda. Mostrar apenas a selecionada eliminaria a visão de conjunto. |
 | **Tailwind CSS no frontend** | O plugin `@tailwindcss/vite` gera CSS a partir das classes utilitárias usadas nos componentes React. | CSS puro exigiria escrever e manter as classes de estilo manualmente. |
@@ -72,7 +72,7 @@ Os corpos de requisição e resposta usam `application/json`. O `id` é um UUID 
 - **Lançamento.** O formato segue o enunciado. No pedido, `x` e `y` são os limites superiores inclusivos da malha. Ambos são obrigatórios e aceitam inteiros de `0` a `100`. Na resposta, `x` e `y` são a posição inicial da sonda. `direction` é obrigatória e segue RN02.
 - **Movimento.** O ID da sonda vai na rota. `commands` é uma string obrigatória com `1` a `1000` caracteres, formada apenas por `M`, `L` e `R` em maiúsculas. A API valida toda a entrada antes de buscar a sonda e simular os passos. Assim, `MMMMMMMX` retorna `422` mesmo quando um avanço anterior sairia da malha. Para entrada válida, o ID inexistente retorna `404` e o avanço fora da malha retorna `409`.
 - **Consultas.** Nas respostas, `x` e `y` são as coordenadas atuais da sonda. A listagem vazia retorna `{"probes":[]}`. A consulta por ID inclui os limites inclusivos em `max_x` e `max_y`.
-- **Reenvio de movimento.** O cliente pode enviar um UUID no cabeçalho `Idempotency-Key`. Reutilize a chave e os mesmos comandos ao repetir uma tentativa sem resposta. A API grava a chave junto com o movimento confirmado e devolve o `200` original nos reenvios, mesmo após reiniciar ou mover a sonda novamente. A chave vale por sonda. Use uma nova chave para cada novo movimento. Sem o cabeçalho, cada envio é tratado como um novo movimento.
+- **Reenvio de movimento.** Cada envio é tratado como um novo movimento, mesmo com os mesmos comandos.
 - **Paginação e ordenação.** Em `GET /probes`, `limit` aceita de `1` a `100` e tem valor padrão `20`. `offset` indica quantos registros pular e começa em `0`. Use `sort_by=id|x|y|direction` e `order=asc|desc`. A ordem padrão é `id` crescente. Direções seguem ordem alfabética e empates usam `id` crescente. Por exemplo, `GET /probes?limit=20&offset=20&sort_by=x&order=desc` busca a segunda página de 20 sondas por `x` decrescente. Um `offset` após o último registro retorna `{"probes":[]}`. Valores inválidos retornam `422 INVALID_INPUT`.
 
 ### 3.1 Respostas de erro
@@ -84,11 +84,8 @@ Erros retornam um objeto JSON com `code` para tratamento pelo React e `message` 
 | `400` | `INVALID_JSON` | Corpo com JSON malformado. |
 | `404` | `PROBE_NOT_FOUND` | O ID informado no movimento ou na consulta individual não existe. |
 | `409` | `OUT_OF_BOUNDS` | Um avanço ultrapassaria os limites da sonda. A sequência inteira é rejeitada. |
-| `409` | `IDEMPOTENCY_CONFLICT` | A chave já confirmou um movimento da mesma sonda com comandos diferentes. |
-| `422` | `INVALID_INPUT` | Corpo ou campo obrigatório ausente, tipo incorreto, limite fora de `0..100`, direção inválida, sequência inválida ou chave de idempotência que não é um UUID. |
-| `503` | `DATABASE_BUSY` | A espera pelo acesso de escrita ao SQLite expirou. |
-
-Em atualizações separadas, publique primeiro o backend com suporte ao cabeçalho. A inicialização adiciona a tabela de movimentos confirmados ao banco existente. Preserve a tabela e o suporte ao cabeçalho enquanto clientes ainda puderem reenviar tentativas.
+| `422` | `INVALID_INPUT` | Corpo ou campo obrigatório ausente, tipo incorreto, limite fora de `0..100`, direção inválida ou sequência inválida. |
+| `503` | `DATABASE_BUSY` | A espera pelo bloqueio de movimento ou pela escrita no SQLite expirou. |
 
 O tratador de `RequestValidationError` traduz `json_invalid` para `400 INVALID_JSON` e as demais falhas de validação da entrada para `422 INVALID_INPUT`. Um teste de integração envia JSON malformado e confere o status e o formato do corpo. [Tratamento de erros do FastAPI](https://fastapi.tiangolo.com/tutorial/handling-errors/#override-request-validation-exceptions)
 
@@ -144,9 +141,9 @@ O banco protege as invariantes do registro com restrições de direção válida
 ### 4.4 Fluxo de movimento
 
 1. A rota valida o corpo inteiro e envia o ID e os comandos ao caso de uso.
-2. O serviço entra em `database.transaction()`, que executa `BEGIN IMMEDIATE` antes de entregar a sessão. O repositório usa essa sessão para carregar a sonda. Um ID desconhecido encerra a operação com `404`.
+2. O serviço adquire o bloqueio de movimento, com espera de até dois segundos. Depois abre uma sessão com `database.transaction()` e carrega a sonda. Um ID desconhecido encerra a operação com `404`.
 3. O domínio percorre os comandos em ordem. Se um avanço sair da malha, informa o passo que falhou. A transação é encerrada sem gravar e a rota responde `409`.
-4. Se todos os passos forem válidos, o repositório grava a posição e a direção finais na mesma sessão. O contexto confirma a transação, e a rota devolve `200` com o estado confirmado.
+4. Se todos os passos forem válidos, o repositório grava a posição e a direção finais na mesma sessão. O serviço libera o bloqueio depois de encerrar a transação. Após um commit bem-sucedido, a rota devolve `200` com o estado confirmado.
 
 No pytest, um teste de integração envia dois avanços simultâneos à mesma sonda, com espaço para ambos. Quando os dois pedidos têm sucesso, a posição final deve refletir os dois movimentos.
 

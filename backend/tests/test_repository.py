@@ -41,12 +41,9 @@ def test_repository_preserves_legacy_database(tmp_path: Path) -> None:
         ).fetchone() == (0, 0, "NORTH")
 
     service = ProbeService(store)
-    moved = service.move_probe(probe_id="existing", commands="M", idempotency_key="key")
+    moved = service.move_probe(probe_id="existing", commands="M")
     assert moved.position.x == 1
-    assert (
-        service.move_probe(probe_id="existing", commands="M", idempotency_key="key")
-        == moved
-    )
+    assert service.get_probe(probe_id="existing") == moved
 
 
 @pytest.mark.parametrize(
