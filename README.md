@@ -21,9 +21,9 @@ Para parar, pressione `Ctrl+C` e execute `docker compose down` na raiz do reposi
 
 ## Primeiro voo
 
-1. Na interface, clique em **Launch probe**. Preencha **X limit** e **Y limit** com `2`, escolha **North** e clique em **Launch**.
+1. Na interface, clique em **Launch probe**. Preencha **X limit** e **Y limit** com `2`, escolha **North** e clique em **Launch**. Anote o ID exibido em **Selected probe**.
 2. Lance outra sonda com limites `(4, 3)` e direção **North**. Em um banco vazio, o mapa exibe `2` na origem e a lista mostra IDs distintos.
-3. Selecione a primeira sonda e envie `MRM` pelo botão **Send commands**. Confira a posição `(1, 1)` e a direção **East**. A segunda sonda permanece na origem.
+3. Na lista **Probe fleet**, clique em **Select** na linha do ID anotado. Você também pode clicar no marcador da origem até selecionar a primeira sonda. Cada clique alterna entre as sondas na célula. Envie `MRM` pelo botão **Send commands**. Confira a posição `(1, 1)` e a direção **East**. A segunda sonda permanece na origem.
 4. Envie `LMM` à primeira sonda. O terceiro comando ultrapassa a borda. A sequência inteira é rejeitada e a sonda permanece em `(1, 1)`, na direção **East**.
 5. Se estiver usando Docker, execute `docker compose restart backend`, recarregue a página e selecione as sondas. Confira os mesmos IDs, posições, direções e limites.
 
@@ -116,9 +116,10 @@ uv --directory backend run --locked pytest
 ```sh
 npm --prefix frontend run lint
 npm --prefix frontend test
-npm --prefix frontend run typecheck
 npm --prefix frontend run build
 ```
+
+Para verificar a formatação, execute `npm --prefix frontend run prettier`. Para formatar os arquivos e aplicar as correções automáticas do ESLint, execute `npm --prefix frontend run format`.
 
 Para verificar a integração entre interface, API e banco, execute o [primeiro voo](#primeiro-voo).
 
@@ -127,6 +128,7 @@ Para verificar a integração entre interface, API e banco, execute o [primeiro 
 | Caminho | Responsabilidade |
 | --- | --- |
 | [`frontend/src/`](frontend/src/) | Interface React em TypeScript, com mapa, lista e formulários. |
+| [`frontend/src/modules/probes/`](frontend/src/modules/probes/) | Hooks das sondas, serviço da API e lógica do mapa. |
 | [`backend/api/`](backend/api/) | Rotas FastAPI, validação HTTP e respostas de erro. |
 | [`backend/services/probe_service.py`](backend/services/probe_service.py) | Casos de uso e limites das transações. |
 | [`backend/domain.py`](backend/domain.py) | Regras de posição, direção e movimento, independentes da API e do banco. |
