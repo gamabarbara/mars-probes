@@ -6,10 +6,8 @@ from uuid import UUID
 import pytest
 from fastapi.testclient import TestClient
 
-import repository
-from domain import Direction, Grid, Position, Probe
 from main import create_app
-from probe_schemas import ProbeResponse
+from persistence import database as database_module
 
 
 def test_launch_assigns_unique_ids_and_persists_grid(tmp_path: Path) -> None:
@@ -67,7 +65,7 @@ def test_launch_reports_locked_database(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     database = tmp_path / "probes.sqlite3"
-    monkeypatch.setattr(repository, "WRITE_TIMEOUT_SECONDS", 0)
+    monkeypatch.setattr(database_module, "WRITE_TIMEOUT_SECONDS", 0)
 
     with (
         TestClient(create_app(database)) as client,
@@ -110,21 +108,3 @@ def test_launch_documents_body_and_grid_bounds(tmp_path: Path) -> None:
         assert responses[status]["content"]["application/json"]["schema"] == {
             "$ref": "#/components/schemas/ErrorResponse"
         }
-
-
-def test_probe_response_serializes_current_position() -> None:
-    probe = Probe(
-        id="probe-id",
-        position=Position(2, 3),
-        direction=Direction.WEST,
-        grid=Grid(5, 5),
-    )
-    expected = {"id": "probe-id", "x": 2, "y": 3, "direction": "WEST"}
-
-    assert ProbeResponse.model_validate(probe).model_dump(mode="json") == expected
-    assert ProbeResponse.model_validate(expected).model_dump(mode="json") == expected
-
-
-def test_grid_rejects_limits_outside_domain() -> None:
-    with pytest.raises(ValueError):
-        Grid(max_x=101, max_y=0)

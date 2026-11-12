@@ -5,23 +5,23 @@ from pathlib import Path
 
 from fastapi import FastAPI
 
-from http_errors import ErrorResponse, register_error_handlers
-from repository import ProbeRepository
-from routers.probes import create_probe_router
+from api.error_handlers import ErrorResponse, register_error_handlers
+from api.probes import create_probe_router
+from persistence.database import Database
 
 
 def create_app(database_path: Path) -> FastAPI:
-    repository = ProbeRepository(database_path)
+    database = Database(database_path)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-        repository.initialize()
+        database.initialize()
         yield
 
     app = FastAPI(title="Mars Probes API", lifespan=lifespan)
     register_error_handlers(app)
     app.include_router(
-        create_probe_router(repository),
+        create_probe_router(database),
         responses={
             400: {"model": ErrorResponse, "description": "Malformed JSON"},
             422: {"model": ErrorResponse, "description": "Invalid request input"},

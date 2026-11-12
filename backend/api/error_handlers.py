@@ -3,7 +3,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from repository import DatabaseBusyError
+from persistence.database import DatabaseBusyError
 
 
 class ErrorResponse(BaseModel):

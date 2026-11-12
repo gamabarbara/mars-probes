@@ -1,4 +1,6 @@
 import sqlite3
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 from sqlalchemy import URL, create_engine
@@ -6,8 +8,7 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import NullPool
 
-from database_models import Base, ProbeRecord
-from domain import Probe
+from persistence.models import Base
 
 WRITE_TIMEOUT_SECONDS = 2.0
 PRIMARY_RESULT_CODE_MASK = 0xFF
@@ -17,29 +18,26 @@ class DatabaseBusyError(Exception):
     pass
 
 
-class ProbeRepository:
+class Database:
     def __init__(self, database_path: Path) -> None:
         self.engine = create_engine(
             URL.create("sqlite+pysqlite", database=str(database_path)),
-            connect_args={"timeout": WRITE_TIMEOUT_SECONDS, "autocommit": False},
+            connect_args={
+                "timeout": WRITE_TIMEOUT_SECONDS,
+                "autocommit": sqlite3.LEGACY_TRANSACTION_CONTROL,
+            },
             poolclass=NullPool,
         )
 
     def initialize(self) -> None:
         Base.metadata.create_all(self.engine)
 
-    def insert(self, probe: Probe) -> None:
-        record = ProbeRecord(
-            id=probe.id,
-            x=probe.position.x,
-            y=probe.position.y,
-            direction=probe.direction.value,
-            max_x=probe.grid.max_x,
-            max_y=probe.grid.max_y,
-        )
+    @contextmanager
+    def transaction(self) -> Iterator[Session]:
         try:
             with Session(self.engine) as session, session.begin():
-                session.add(record)
+                session.connection().exec_driver_sql("BEGIN IMMEDIATE")
+                yield session
         except OperationalError as error:
             cause = error.orig
             if (

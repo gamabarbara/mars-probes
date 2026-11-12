@@ -6,9 +6,10 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from database_models import ProbeRecord
 from domain import Direction, Grid, Probe
-from repository import ProbeRepository
+from persistence.database import Database
+from persistence.models import ProbeRecord
+from persistence.repository import ProbeRepository
 
 
 def test_repository_preserves_legacy_database(tmp_path: Path) -> None:
@@ -22,10 +23,13 @@ def test_repository_preserves_legacy_database(tmp_path: Path) -> None:
         )
         connection.commit()
 
-    repository = ProbeRepository(database)
-    repository.initialize()
-    repository.initialize()
-    repository.insert(Probe.at_origin("new", Grid(4, 4), Direction.NORTH))
+    store = Database(database)
+    store.initialize()
+    store.initialize()
+    with store.transaction() as session:
+        ProbeRepository(session).insert(
+            Probe.at_origin("new", Grid(4, 4), Direction.NORTH)
+        )
 
     with closing(connect(database)) as connection:
         assert connection.execute(
@@ -52,8 +56,8 @@ def test_repository_preserves_legacy_database(tmp_path: Path) -> None:
 def test_database_enforces_constraints(
     tmp_path: Path, fields: dict[str, object]
 ) -> None:
-    repository = ProbeRepository(tmp_path / "probes.sqlite3")
-    repository.initialize()
+    store = Database(tmp_path / "probes.sqlite3")
+    store.initialize()
     values = {
         "id": "invalid",
         "max_x": 5,
@@ -65,26 +69,30 @@ def test_database_enforces_constraints(
     }
     with (
         pytest.raises(IntegrityError),
-        Session(repository.engine) as session,
+        Session(store.engine) as session,
         session.begin(),
     ):
         session.add(ProbeRecord(**values))
 
-    with Session(repository.engine) as session:
+    with Session(store.engine) as session:
         assert session.get(ProbeRecord, "invalid") is None
 
 
 def test_failed_insert_rolls_back_and_repository_remains_usable(tmp_path: Path) -> None:
-    repository = ProbeRepository(tmp_path / "probes.sqlite3")
-    repository.initialize()
+    store = Database(tmp_path / "probes.sqlite3")
+    store.initialize()
     probe = Probe.at_origin("first", Grid(5, 5), Direction.EAST)
-    repository.insert(probe)
+    with store.transaction() as session:
+        ProbeRepository(session).insert(probe)
 
-    with pytest.raises(IntegrityError):
-        repository.insert(probe)
-    repository.insert(Probe.at_origin("second", Grid(2, 2), Direction.SOUTH))
+    with pytest.raises(IntegrityError), store.transaction() as session:
+        ProbeRepository(session).insert(probe)
+    with store.transaction() as session:
+        ProbeRepository(session).insert(
+            Probe.at_origin("second", Grid(2, 2), Direction.SOUTH)
+        )
 
-    with Session(repository.engine) as session:
+    with Session(store.engine) as session:
         first = session.get(ProbeRecord, "first")
         assert first is not None
         assert (first.x, first.y, first.direction) == (0, 0, "EAST")
