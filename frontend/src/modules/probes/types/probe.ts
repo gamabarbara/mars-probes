@@ -14,8 +14,6 @@ export type ProbeDetail = Probe & {
 
 export type ProbeListResponse = { probes: Probe[] };
 
-export type ApiError = { message?: string };
-
 export type ProbeSelectionProps = {
   selectedId: string | null;
   moving: boolean;

@@ -1,32 +1,16 @@
-import { useState } from "react";
+import { directionLabels } from "../modules/probes/directionLabels";
+import { useProbeList } from "../modules/probes/hooks/useProbeList";
+import type { ProbeSelectionProps } from "../modules/probes/types/probe";
 
-import { directionLabels } from "../directionLabels";
-import { useProbeQuery } from "../useProbeQuery";
-
-import type { ProbeListResponse, ProbeSelectionProps } from "../probeTypes";
-
-const pageSize = 20;
 const selectClass = "mission-field";
 const buttonClass = "mission-button";
 
 type ProbeListProps = ProbeSelectionProps & { revision: number };
 
 export function ProbeList({ revision, selectedId, moving, onSelect }: ProbeListProps) {
-  const [page, setPage] = useState(0);
-  const [sortBy, setSortBy] = useState("id");
-  const [order, setOrder] = useState("asc");
-  const query = new URLSearchParams({
-    limit: String(pageSize + 1),
-    offset: String(page * pageSize),
-    sort_by: sortBy,
-    order,
-  });
-  const queryResult = useProbeQuery<ProbeListResponse>(
-    `/probes?${query}`, revision, "Could not load the probes.",
-  );
+  const { page, setPage, sortBy, order, changeSortBy, changeOrder, queryResult, probes, hasNextPage } =
+    useProbeList(revision);
   const { status, retry } = queryResult;
-  const probes = status === "success" ? queryResult.data.probes : [];
-  const hasNextPage = status === "success" && probes.length > pageSize;
 
   return (
     <section className="mission-panel fleet-panel" aria-labelledby="probe-list-title">
@@ -34,10 +18,7 @@ export function ProbeList({ revision, selectedId, moving, onSelect }: ProbeListP
       <div className="fleet-filters">
         <label className="text-sm font-medium">
           Sort by
-          <select className={selectClass} value={sortBy} onChange={(event) => {
-            setSortBy(event.target.value);
-            setPage(0);
-          }}>
+          <select className={selectClass} value={sortBy} onChange={(event) => changeSortBy(event.target.value)}>
             <option value="id">ID</option>
             <option value="x">X</option>
             <option value="y">Y</option>
@@ -46,10 +27,7 @@ export function ProbeList({ revision, selectedId, moving, onSelect }: ProbeListP
         </label>
         <label className="text-sm font-medium">
           Sort order
-          <select className={selectClass} value={order} onChange={(event) => {
-            setOrder(event.target.value);
-            setPage(0);
-          }}>
+          <select className={selectClass} value={order} onChange={(event) => changeOrder(event.target.value)}>
             <option value="asc">Ascending</option>
             <option value="desc">Descending</option>
           </select>
@@ -78,7 +56,7 @@ export function ProbeList({ revision, selectedId, moving, onSelect }: ProbeListP
             </tr>
           </thead>
           <tbody>
-            {probes.slice(0, pageSize).map(({ id, x, y, direction }) => (
+            {probes.map(({ id, x, y, direction }) => (
               <tr key={id} className={selectedId === id ? "fleet-selected" : undefined}>
                 <td className="probe-id">{id}</td>
                 <td className="fleet-position">({x}, {y})</td>

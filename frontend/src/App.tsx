@@ -1,24 +1,14 @@
-import { useState } from "react";
-import { directionLabels } from "./directionLabels";
 import { LaunchForm } from "./components/LaunchForm";
 import { MoveForm } from "./components/MoveForm";
 import { ProbeList } from "./components/ProbeList";
 import { ProbeOverview, ProbeControl } from "./components/ProbeOverview";
-import { useProbeQuery } from "./useProbeQuery";
-import type { Probe, ProbeDetail } from "./probeTypes";
+import { directionLabels } from "./modules/probes/directionLabels";
+import { useMissionControl } from "./modules/probes/hooks/useMissionControl";
 
 export function App() {
-  const [launch, setLaunch] = useState<{ count: number; probe: Probe | null }>({ count: 0, probe: null });
-  const [moveRevision, setMoveRevision] = useState(0);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [moving, setMoving] = useState(false);
-  const collectionRevision = launch.count + moveRevision;
-  const detailUrl = selectedId === null ? null : `/probes/${encodeURIComponent(selectedId)}`;
-  const detail = useProbeQuery<ProbeDetail>(detailUrl, moveRevision, "Could not load the selected probe.");
-
-  function selectProbe(id: string | null) {
-    if (!moving) setSelectedId(id);
-  }
+  const {
+    launch, collectionRevision, detail, selectedId, moving, setMoving, selectProbe, handleLaunched, refreshAfterMove,
+  } = useMissionControl();
 
   return (
     <>
@@ -34,10 +24,7 @@ export function App() {
             <h1>Surface operations</h1>
             <p>Track and command your probes on the Martian plateau.</p>
           </div>
-          <LaunchForm disabled={moving} onLaunched={(probe) => {
-            setLaunch(({ count }) => ({ count: count + 1, probe }));
-            setSelectedId(probe.id);
-          }} />
+          <LaunchForm disabled={moving} onLaunched={handleLaunched} />
         </div>
         <div role="status" className="launch-notice">
           {launch.probe && (
@@ -63,7 +50,7 @@ export function App() {
                 probeId={selectedId}
                 moving={moving}
                 onMovingChange={setMoving}
-                onRefresh={() => setMoveRevision((revision) => revision + 1)}
+                onRefresh={refreshAfterMove}
               />
             )}
           </ProbeControl>

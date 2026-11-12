@@ -1,4 +1,4 @@
-import type { Direction } from "./probeTypes";
+import type { Direction } from "./types/probe";
 
 export const directionLabels: Record<Direction, string> = {
   NORTH: "North",

@@ -1,9 +1,9 @@
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import type { FormEvent } from "react";
 
-import { directionLabels } from "../directionLabels";
-
-import type { ApiError, Probe } from "../probeTypes";
+import { directionLabels } from "../modules/probes/directionLabels";
+import { useLaunchProbe } from "../modules/probes/hooks/useLaunchProbe";
+import type { Probe } from "../modules/probes/types/probe";
 
 const gridValidation = {
   onInvalid(event: FormEvent<HTMLInputElement>) {
@@ -20,43 +20,13 @@ export function LaunchForm({ disabled, onLaunched }: LaunchFormProps) {
   const dialog = useRef<HTMLDialogElement>(null);
   const formElement = useRef<HTMLFormElement>(null);
   const xLimit = useRef<HTMLInputElement>(null);
-  const [launching, setLaunching] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (launching) return;
-    const form = new FormData(event.currentTarget);
-    setLaunching(true);
-    setError(null);
-
-    try {
-      const response = await fetch("/probes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          x: Number(form.get("x")),
-          y: Number(form.get("y")),
-          direction: form.get("direction"),
-        }),
-      });
-      if (!response.ok) {
-        const body: ApiError | null = await response.json().catch(() => null);
-        setError(body?.message || "Could not launch the probe. Try again.");
-        return;
-      }
-      const probe: Probe = await response.json();
-      dialog.current?.close();
-      onLaunched?.(probe);
-    } catch {
-      setError("Could not connect to the API. Try again.");
-    } finally {
-      setLaunching(false);
-    }
-  }
+  const { launching, error, clearError, handleSubmit } = useLaunchProbe((probe) => {
+    dialog.current?.close();
+    onLaunched?.(probe);
+  });
 
   function openDialog() {
-    setError(null);
+    clearError();
     const form = formElement.current;
     if (!form || !dialog.current) return;
     form.reset();

@@ -1,11 +1,10 @@
 import type { ReactNode } from "react";
 
-import { directionArrows, directionLabels } from "../directionLabels";
-import { useProbeQuery } from "../useProbeQuery";
+import { directionArrows, directionLabels } from "../modules/probes/directionLabels";
+import { useProbeQuery } from "../modules/probes/hooks/useProbeQuery";
+import type { ProbeQuery } from "../modules/probes/hooks/useProbeQuery";
+import type { Probe, ProbeDetail, ProbeListResponse, ProbeSelectionProps } from "../modules/probes/types/probe";
 import { ProbeMap } from "./ProbeMap";
-
-import type { ProbeQuery } from "../useProbeQuery";
-import type { Probe, ProbeDetail, ProbeListResponse, ProbeSelectionProps } from "../probeTypes";
 
 const MAP_PAGE_SIZE = 100;
 

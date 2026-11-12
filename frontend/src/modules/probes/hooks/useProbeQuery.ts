@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import type { ApiError } from "./probeTypes";
+import { ProbeApiError, readProbeData } from "../services/probeService";
 
 type QueryOutcome<T> =
   | { status: "success"; data: T }
@@ -12,8 +12,6 @@ export type ProbeQuery<T> = (QueryOutcome<T> | { status: "loading" }) & { retry:
 
 type ReadQuery<T> = (url: string) => Promise<T>;
 type LoadQuery<T> = (url: string, read: ReadQuery<T>) => Promise<T>;
-
-class ProbeQueryError extends Error {}
 
 export function useProbeQuery<T>(
   url: string | null, revision: number, fallbackMessage: string, loadQuery?: LoadQuery<T>,
@@ -32,22 +30,15 @@ export function useProbeQuery<T>(
       if (!signal.aborted) setResult({ url, revision, attempt, ...outcome });
     };
 
-    const read: ReadQuery<T> = async (pageUrl) => {
-      signal.throwIfAborted();
-      const response = await fetch(pageUrl, { signal });
-      if (!response.ok) {
-        const body: ApiError | null = await response.json().catch(() => null);
-        throw new ProbeQueryError(body?.message || fallbackMessage);
-      }
-      return response.json();
-    };
+    const read: ReadQuery<T> = (pageUrl) => readProbeData<T>(pageUrl, signal);
 
     const load = async () => {
       try {
         const data = await (loadQuery ? loadQuery(url, read) : read(url));
         finish({ status: "success", data });
       } catch (error) {
-        finish({ status: "error", message: error instanceof ProbeQueryError ? error.message : fallbackMessage });
+        const message = error instanceof ProbeApiError ? error.message : "";
+        finish({ status: "error", message: message || fallbackMessage });
       }
     };
 

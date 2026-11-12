@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vitest";
 
 import { App } from "./App";
-import type { Probe } from "./probeTypes";
+import type { Probe } from "./modules/probes/types/probe";
 
 afterEach(cleanup);
 
