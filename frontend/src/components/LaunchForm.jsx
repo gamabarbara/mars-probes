@@ -1,15 +1,10 @@
 import { useState } from "react";
 
-const directions = {
-  NORTH: "Norte",
-  EAST: "Leste",
-  SOUTH: "Sul",
-  WEST: "Oeste",
-};
+import { directionLabels } from "../directionLabels.js";
 
 const fieldClass = "mt-1 w-full rounded-md border border-slate-400 bg-white px-3 py-2";
 
-export function LaunchForm() {
+export function LaunchForm({ onLaunched }) {
   const [launching, setLaunching] = useState(false);
   const [probe, setProbe] = useState(null);
   const [error, setError] = useState(null);
@@ -37,6 +32,7 @@ export function LaunchForm() {
         return;
       }
       setProbe(await response.json());
+      onLaunched?.();
     } catch {
       setError("Não foi possível conectar à API. Tente novamente.");
     } finally {
@@ -64,7 +60,7 @@ export function LaunchForm() {
         <label className="block text-sm font-medium">
           Direção inicial
           <select className={fieldClass} name="direction" defaultValue="NORTH">
-            {Object.entries(directions).map(([value, label]) => (
+            {Object.entries(directionLabels).map(([value, label]) => (
               <option key={value} value={value}>{label}</option>
             ))}
           </select>
@@ -78,7 +74,7 @@ export function LaunchForm() {
         <div role="status" className="mt-4 rounded-md bg-emerald-50 p-4 text-emerald-950">
           <p className="font-semibold">Sonda lançada.</p>
           <p className="break-all">ID: {probe.id}</p>
-          <p>Posição: ({probe.x}, {probe.y}) · Direção: {directions[probe.direction]}</p>
+          <p>Posição: ({probe.x}, {probe.y}) · Direção: {directionLabels[probe.direction]}</p>
         </div>
       )}
     </section>
