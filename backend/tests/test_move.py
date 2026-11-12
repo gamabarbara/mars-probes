@@ -6,7 +6,7 @@ from threading import Barrier, Event
 
 import pytest
 from fastapi.testclient import TestClient
-from httpx import Response
+from httpx2 import Response
 
 import probe_service
 from domain import Probe

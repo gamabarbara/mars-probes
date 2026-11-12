@@ -5,10 +5,8 @@ from sqlite3 import connect
 import pytest
 from fastapi.testclient import TestClient
 
-from api.probes_rest import get_probe_service
 from main import create_app
 from persistence import database as database_module
-from probe_service import ProbeService
 
 
 def test_lists_no_probes_before_first_launch(tmp_path: Path) -> None:
@@ -19,20 +17,15 @@ def test_lists_no_probes_before_first_launch(tmp_path: Path) -> None:
     assert response.json() == {"probes": []}
 
 
-def test_probe_service_dependency_can_be_overridden(tmp_path: Path) -> None:
-    app = create_app(tmp_path / "probes.sqlite3")
-    replacement = database_module.Database(tmp_path / "replacement.sqlite3")
-    replacement.initialize()
-    service = ProbeService(replacement)
-    app.dependency_overrides[get_probe_service] = lambda: service
-
-    with TestClient(app) as client:
+def test_apps_keep_their_probe_services_isolated(tmp_path: Path) -> None:
+    with (
+        TestClient(create_app(tmp_path / "probes.sqlite3")) as client,
+        TestClient(create_app(tmp_path / "other.sqlite3")) as other,
+    ):
         launched = client.post("/probes", json={"x": 2, "y": 4, "direction": "EAST"})
         assert launched.status_code == 201
         assert client.get("/probes").json() == {"probes": [launched.json()]}
-
-        del app.dependency_overrides[get_probe_service]
-        assert client.get("/probes").json() == {"probes": []}
+        assert other.get("/probes").json() == {"probes": []}
 
 
 def test_lists_launched_probes_after_reopening_database(tmp_path: Path) -> None:

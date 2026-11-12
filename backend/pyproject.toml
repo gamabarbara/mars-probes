@@ -10,7 +10,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["httpx", "mypy", "pytest", "ruff"]
+dev = ["httpx2", "mypy", "pytest", "ruff"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
