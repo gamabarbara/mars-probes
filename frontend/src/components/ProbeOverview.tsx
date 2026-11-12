@@ -28,7 +28,7 @@ export function ProbeOverview({ collectionRevision, detail, selectedId, moving, 
   const selected = selectedId !== null && detail.status === "success" ? detail.data : null;
 
   return (
-    <section className="mission-panel" aria-labelledby="probe-map-title">
+    <section className="mission-panel map-panel" aria-labelledby="probe-map-title">
       <div className="panel-heading">
         <h2 id="probe-map-title">Plateau map</h2>
         {collection.status === "success" && (
