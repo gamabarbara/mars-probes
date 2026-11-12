@@ -1,14 +1,15 @@
-import { useState } from "react";
+import { useState } from 'react';
 
-import type { ProbeListResponse } from "../types/probe";
-import { useProbeQuery } from "./useProbeQuery";
+import type { ProbeListResponse } from '../types/probe';
+
+import { useProbeQuery } from './useProbeQuery';
 
 const pageSize = 20;
 
 export function useProbeList(revision: number) {
   const [page, setPage] = useState(0);
-  const [sortBy, setSortBy] = useState("id");
-  const [order, setOrder] = useState("asc");
+  const [sortBy, setSortBy] = useState('id');
+  const [order, setOrder] = useState('asc');
   const query = new URLSearchParams({
     limit: String(pageSize + 1),
     offset: String(page * pageSize),
@@ -16,20 +17,22 @@ export function useProbeList(revision: number) {
     order,
   });
   const queryResult = useProbeQuery<ProbeListResponse>(
-    `/probes?${query}`, revision, "Could not load the probes.",
+    `/probes?${query}`,
+    revision,
+    'Could not load the probes.'
   );
-  const probes = queryResult.status === "success" ? queryResult.data.probes : [];
+  const { status, retry } = queryResult;
+  const probes = status === 'success' ? queryResult.data.probes : [];
+  const hasNextPage = status === 'success' && probes.length > pageSize;
 
   function changeSortBy(value: string) {
     setSortBy(value);
     setPage(0);
   }
-
   function changeOrder(value: string) {
     setOrder(value);
     setPage(0);
   }
-
   return {
     page,
     setPage,
@@ -38,7 +41,9 @@ export function useProbeList(revision: number) {
     changeSortBy,
     changeOrder,
     queryResult,
+    status,
+    retry,
     probes: probes.slice(0, pageSize),
-    hasNextPage: probes.length > pageSize,
+    hasNextPage,
   };
 }

@@ -1,13 +1,21 @@
-import { LaunchForm } from "./components/LaunchForm";
-import { MoveForm } from "./components/MoveForm";
-import { ProbeList } from "./components/ProbeList";
-import { ProbeOverview, ProbeControl } from "./components/ProbeOverview";
-import { directionLabels } from "./modules/probes/directionLabels";
-import { useMissionControl } from "./modules/probes/hooks/useMissionControl";
+import { LaunchForm } from './components/LaunchForm';
+import { MoveForm } from './components/MoveForm';
+import { ProbeList } from './components/ProbeList';
+import { ProbeOverview, ProbeControl } from './components/ProbeOverview';
+import { directionLabels } from './contants/directionLabels';
+import { useMissionControl } from './modules/probes/hooks/useMissionControl';
 
 export function App() {
   const {
-    launch, collectionRevision, detail, selectedId, moving, setMoving, selectProbe, handleLaunched, refreshAfterMove,
+    launch,
+    collectionRevision,
+    detail,
+    selectedId,
+    moving,
+    setMoving,
+    selectProbe,
+    handleLaunched,
+    refreshAfterMove,
   } = useMissionControl();
 
   return (
@@ -15,7 +23,10 @@ export function App() {
       <header className="mission-header">
         <div className="mission-shell mission-brand">
           <span className="mission-logo" aria-hidden="true" />
-          <div><strong>Mars Probes</strong><span>Mission Control</span></div>
+          <div>
+            <strong>Mars Probes</strong>
+            <span>Mission Control</span>
+          </div>
         </div>
       </header>
       <main className="mission-shell mission-main">
@@ -29,8 +40,11 @@ export function App() {
         <div role="status" className="launch-notice">
           {launch.probe && (
             <>
-              <strong>Probe launched.</strong>{" "}
-              <span>Position: ({launch.probe.x}, {launch.probe.y}) · Direction: {directionLabels[launch.probe.direction]}</span>
+              <strong>Probe launched.</strong>{' '}
+              <span>
+                Position: ({launch.probe.x}, {launch.probe.y}) · Direction:{' '}
+                {directionLabels[launch.probe.direction]}
+              </span>
             </>
           )}
         </div>
@@ -42,8 +56,12 @@ export function App() {
             moving={moving}
             onSelect={selectProbe}
           />
-          <ProbeControl detail={detail} selectedId={selectedId} moving={moving}
-            onClearSelection={() => selectProbe(null)}>
+          <ProbeControl
+            detail={detail}
+            selectedId={selectedId}
+            moving={moving}
+            onClearSelection={() => selectProbe(null)}
+          >
             {selectedId !== null && (
               <MoveForm
                 key={selectedId}

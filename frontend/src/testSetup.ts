@@ -1,4 +1,11 @@
-// jsdom exposes HTMLDialogElement but does not implement its modal methods.
+import { afterAll, afterEach, beforeAll } from 'vitest';
+
+import { server } from './testServer';
+
+beforeAll(() => server.listen({ onUnhandledFrame: 'error' }));
+afterEach(() => server.resetHandlers());
+afterAll(() => server.close());
+
 HTMLDialogElement.prototype.showModal ??= function () {
   this.open = true;
 };

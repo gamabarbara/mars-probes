@@ -1,0 +1,31 @@
+# Ignore files for Prettier
+dist/
+build/
+node_modules/
+coverage/
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Package manager lock files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db

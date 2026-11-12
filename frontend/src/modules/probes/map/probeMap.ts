@@ -1,9 +1,11 @@
-import type { Probe, ProbeDetail } from "../types/probe";
+import type { Probe, ProbeDetail } from '../types/probe';
 
 export function axisTicks(max: number) {
   if (max === 0) return [0];
   const intervals = Math.min(max, 5);
-  return Array.from({ length: intervals + 1 }, (_, i) => Math.round(i * max / intervals));
+  return Array.from({ length: intervals + 1 }, (_, i) =>
+    Math.round((i * max) / intervals)
+  );
 }
 
 export function buildProbeMap(probes: Probe[], selected: ProbeDetail | null) {
@@ -13,10 +15,13 @@ export function buildProbeMap(probes: Probe[], selected: ProbeDetail | null) {
 
   function addProbe(probe: Probe) {
     const { x, y } = probe;
+
     maxX = Math.max(maxX, x);
     maxY = Math.max(maxY, y);
+
     const key = `${x},${y}`;
     const group = cells.get(key);
+
     if (group) group.push(probe);
     else cells.set(key, [probe]);
   }

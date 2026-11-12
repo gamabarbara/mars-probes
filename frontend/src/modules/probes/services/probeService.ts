@@ -1,37 +1,40 @@
-import type { Probe } from "../types/probe";
+import { api } from '../../../shared/services/api';
+import type { Probe, ProbeListResponse } from '../types/probe';
 
-export class ProbeApiError extends Error {
-  constructor(readonly status: number, message?: string) {
-    super(message);
-  }
-}
+const mapPageSize = 100;
 
-export async function readProbeData<T>(url: string, signal: AbortSignal): Promise<T> {
-  signal.throwIfAborted();
-  return requestProbeData<T>(url, { signal });
-}
+export const probeService = {
+  async get<T>(url: string, signal: AbortSignal): Promise<T> {
+    const { data } = await api.get<T>(url, { signal });
+    return data;
+  },
 
-export function launchProbe(input: { x: number; y: number; direction: FormDataEntryValue | null }) {
-  return postProbeData("/probes", input);
-}
+  async listAll(url: string, signal: AbortSignal): Promise<ProbeListResponse> {
+    const probes: Probe[] = [];
+    for (let offset = 0; ; offset += mapPageSize) {
+      const { probes: page } = await probeService.get<ProbeListResponse>(
+        `${url}?limit=${mapPageSize}&offset=${offset}`,
+        signal
+      );
+      probes.push(...page);
+      if (page.length < mapPageSize) return { probes };
+    }
+  },
 
-export function moveProbe(id: string, commands: string) {
-  return postProbeData(`/probes/${encodeURIComponent(id)}/commands`, { commands });
-}
+  async launch(input: {
+    x: number;
+    y: number;
+    direction: FormDataEntryValue | null;
+  }): Promise<Probe> {
+    const { data } = await api.post<Probe>('/probes', input);
+    return data;
+  },
 
-function postProbeData(url: string, body: object) {
-  return requestProbeData<Probe>(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-}
-
-async function requestProbeData<T>(url: string, options: RequestInit): Promise<T> {
-  const response = await fetch(url, options);
-  if (!response.ok) {
-    const body: { message?: string } | null = await response.json().catch(() => null);
-    throw new ProbeApiError(response.status, body?.message);
-  }
-  return response.json();
-}
+  async move(probeId: string, commands: string): Promise<Probe> {
+    const { data } = await api.post<Probe>(
+      `/probes/${encodeURIComponent(probeId)}/commands`,
+      { commands }
+    );
+    return data;
+  },
+};

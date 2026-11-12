@@ -1,9 +1,10 @@
-import { useState } from "react";
-import type { FormEvent } from "react";
+import { useState } from 'react';
+import type { FormEvent } from 'react';
 
-import { directionLabels } from "../directionLabels";
-import { moveProbe, ProbeApiError } from "../services/probeService";
-import type { Probe } from "../types/probe";
+import { directionLabels } from '../../../contants/directionLabels';
+import { getApiError } from '../../../shared/services/apiError';
+import { probeService } from '../services/probeService';
+import type { Probe } from '../types/probe';
 
 export type MoveFormProps = {
   probeId: string;
@@ -12,10 +13,15 @@ export type MoveFormProps = {
   onRefresh: () => void;
 };
 
-const uncertainMove = "Could not confirm whether the probe moved.";
+const uncertainMove = 'Could not confirm whether the probe moved.';
 
-export function useMoveForm({ probeId, moving, onMovingChange, onRefresh }: MoveFormProps) {
-  const [commands, setCommands] = useState("");
+export function useMoveForm({
+  probeId,
+  moving,
+  onMovingChange,
+  onRefresh,
+}: MoveFormProps) {
+  const [commands, setCommands] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [position, setPosition] = useState<Probe | null>(null);
 
@@ -25,31 +31,50 @@ export function useMoveForm({ probeId, moving, onMovingChange, onRefresh }: Move
 
     setError(null);
     setPosition(null);
-    if (commands.length < 1 || commands.length > 1000 || /[^LRM]/.test(commands)) {
-      setError("Enter 1 to 1000 commands using only uppercase L, R, and M.");
+    if (
+      commands.length < 1 ||
+      commands.length > 1000 ||
+      /[^LRM]/.test(commands)
+    ) {
+      setError('Enter 1 to 1000 commands using only uppercase L, R, and M.');
       return;
     }
 
     onMovingChange(true);
     try {
-      const result = await moveProbe(probeId, commands);
-      if (result?.id !== probeId || !Number.isInteger(result.x) ||
-          !Number.isInteger(result.y) || !Object.hasOwn(directionLabels, result.direction)) {
-        throw new Error("Invalid move response");
+      const result = await probeService.move(probeId, commands);
+      if (
+        result?.id !== probeId ||
+        !Number.isInteger(result.x) ||
+        !Number.isInteger(result.y) ||
+        !Object.hasOwn(directionLabels, result.direction)
+      ) {
+        throw new Error('Invalid move response');
       }
       setPosition(result);
     } catch (error) {
-      if (error instanceof ProbeApiError && error.status >= 400 && error.status < 500) {
-        setError(error.message || "Could not move the probe.");
+      const apiError = getApiError(error);
+      if (
+        apiError.status !== undefined &&
+        apiError.status >= 400 &&
+        apiError.status < 500
+      ) {
+        setError(apiError.message || 'Could not move the probe.');
         return;
       }
-      setError(error instanceof ProbeApiError && error.message ? error.message : uncertainMove);
+      setError(apiError.message || uncertainMove);
     } finally {
       onMovingChange(false);
     }
-    setCommands("");
+    setCommands('');
     onRefresh();
   }
 
-  return { commands, setCommands, error, position, handleSubmit };
+  return {
+    commands,
+    setCommands,
+    error,
+    position,
+    handleSubmit,
+  };
 }

@@ -1,4 +1,4 @@
-export type Direction = "NORTH" | "EAST" | "SOUTH" | "WEST";
+export type Direction = 'NORTH' | 'EAST' | 'SOUTH' | 'WEST';
 
 export type Probe = {
   id: string;
@@ -13,6 +13,8 @@ export type ProbeDetail = Probe & {
 };
 
 export type ProbeListResponse = { probes: Probe[] };
+
+export type ApiError = { message?: string };
 
 export type ProbeSelectionProps = {
   selectedId: string | null;

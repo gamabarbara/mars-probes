@@ -1,10 +1,14 @@
-import { useState } from "react";
-import type { FormEvent } from "react";
+import { useState } from 'react';
+import type { FormEvent, RefObject } from 'react';
 
-import { launchProbe, ProbeApiError } from "../services/probeService";
-import type { Probe } from "../types/probe";
+import { getApiError } from '../../../shared/services/apiError';
+import { probeService } from '../services/probeService';
+import type { Probe } from '../types/probe';
 
-export function useLaunchProbe(onLaunched: (probe: Probe) => void) {
+export function useLaunchProbe(
+  dialog: RefObject<HTMLDialogElement | null>,
+  onLaunched?: (probe: Probe) => void
+) {
   const [launching, setLaunching] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -16,20 +20,24 @@ export function useLaunchProbe(onLaunched: (probe: Probe) => void) {
     setError(null);
 
     try {
-      const probe = await launchProbe({
-        x: Number(form.get("x")),
-        y: Number(form.get("y")),
-        direction: form.get("direction"),
+      const probe = await probeService.launch({
+        x: Number(form.get('x')),
+        y: Number(form.get('y')),
+        direction: form.get('direction'),
       });
-      onLaunched(probe);
+      dialog.current?.close();
+      onLaunched?.(probe);
     } catch (error) {
-      setError(error instanceof ProbeApiError
-        ? error.message || "Could not launch the probe. Try again."
-        : "Could not connect to the API. Try again.");
+      const apiError = getApiError(error);
+      setError(
+        apiError.status === undefined
+          ? 'Could not connect to the API. Try again.'
+          : apiError.message || 'Could not launch the probe. Try again.'
+      );
     } finally {
       setLaunching(false);
     }
   }
 
-  return { launching, error, clearError: () => setError(null), handleSubmit };
+  return { launching, error, setError, handleSubmit };
 }
