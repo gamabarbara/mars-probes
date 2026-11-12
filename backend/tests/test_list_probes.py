@@ -5,6 +5,7 @@ from sqlite3 import connect
 import pytest
 from fastapi.testclient import TestClient
 
+from api.probes import get_database
 from main import create_app
 from persistence import database as database_module
 
@@ -15,6 +16,21 @@ def test_lists_no_probes_before_first_launch(tmp_path: Path) -> None:
 
     assert response.status_code == 200
     assert response.json() == {"probes": []}
+
+
+def test_database_dependency_can_be_overridden(tmp_path: Path) -> None:
+    app = create_app(tmp_path / "probes.sqlite3")
+    replacement = database_module.Database(tmp_path / "replacement.sqlite3")
+    replacement.initialize()
+    app.dependency_overrides[get_database] = lambda: replacement
+
+    with TestClient(app) as client:
+        launched = client.post("/probes", json={"x": 2, "y": 4, "direction": "EAST"})
+        assert launched.status_code == 201
+        assert client.get("/probes").json() == {"probes": [launched.json()]}
+
+        del app.dependency_overrides[get_database]
+        assert client.get("/probes").json() == {"probes": []}
 
 
 def test_lists_launched_probes_after_reopening_database(tmp_path: Path) -> None:

@@ -16,6 +16,7 @@ class ErrorResponse(BaseModel):
 
 
 class OutOfBoundsResponse(ErrorResponse):
+    code: Literal["OUT_OF_BOUNDS"]
     step: int
 
 

@@ -6,7 +6,7 @@ from pathlib import Path
 from fastapi import FastAPI
 
 from api.error_handlers import register_error_handlers
-from api.router import create_api_router
+from api.router import api_router
 from persistence.database import Database
 
 
@@ -19,8 +19,9 @@ def create_app(database_path: Path) -> FastAPI:
         yield
 
     app = FastAPI(title="Mars Probes API", lifespan=lifespan)
+    app.state.database = database
     register_error_handlers(app)
-    app.include_router(create_api_router(database))
+    app.include_router(api_router)
     return app
 
 

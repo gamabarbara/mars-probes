@@ -248,7 +248,12 @@ def test_move_documents_its_request_and_responses(tmp_path: Path) -> None:
         "#/components/schemas/IdempotencyConflictResponse",
     }
     error_fields = schema["components"]["schemas"]["OutOfBoundsResponse"]["properties"]
+    assert error_fields["code"]["const"] == "OUT_OF_BOUNDS"
     assert error_fields["step"]["type"] == "integer"
+    idempotency_fields = schema["components"]["schemas"]["IdempotencyConflictResponse"][
+        "properties"
+    ]
+    assert idempotency_fields["code"]["const"] == "IDEMPOTENCY_CONFLICT"
     assert set(schema["paths"]["/probes"]["post"]["responses"]) == {
         "201",
         "400",
