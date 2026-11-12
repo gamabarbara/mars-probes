@@ -72,6 +72,7 @@ Os corpos de requisição e resposta usam `application/json`. O `id` é um UUID 
 - **Lançamento.** O formato segue o enunciado. No pedido, `x` e `y` são os limites superiores inclusivos da malha. Ambos são obrigatórios e aceitam inteiros de `0` a `100`. Na resposta, `x` e `y` são a posição inicial da sonda. `direction` é obrigatória e segue RN02.
 - **Movimento.** O ID da sonda vai na rota. `commands` é uma string obrigatória com `1` a `1000` caracteres, formada apenas por `M`, `L` e `R` em maiúsculas. A API valida toda a entrada antes de buscar a sonda e simular os passos. Assim, `MMMMMMMX` retorna `422` mesmo quando um avanço anterior sairia da malha. Para entrada válida, o ID inexistente retorna `404` e o avanço fora da malha retorna `409`.
 - **Consultas.** Nas respostas, `x` e `y` são as coordenadas atuais da sonda. A listagem vazia retorna `{"probes":[]}`. A consulta por ID inclui os limites inclusivos em `max_x` e `max_y`.
+- **Reenvio de movimento.** O cliente pode enviar um UUID no cabeçalho `Idempotency-Key`. Reutilize a chave e os mesmos comandos ao repetir uma tentativa sem resposta. A API grava a chave junto com o movimento confirmado e devolve o `200` original nos reenvios, mesmo após reiniciar ou mover a sonda novamente. A chave vale por sonda. Use uma nova chave para cada novo movimento. Sem o cabeçalho, cada envio é tratado como um novo movimento.
 - **Paginação e ordenação.** Em `GET /probes`, `limit` aceita de `1` a `100` e, quando omitido, retorna todos os registros a partir de `offset`. `offset` indica quantos registros pular e começa em `0`. Use `sort_by=id|x|y|direction` e `order=asc|desc`. A ordem padrão é `id` crescente. Direções seguem ordem alfabética e empates usam `id` crescente. Por exemplo, `GET /probes?limit=20&offset=20&sort_by=x&order=desc` busca a segunda página de 20 sondas por `x` decrescente. Um `offset` após o último registro retorna `{"probes":[]}`. Valores inválidos retornam `422 INVALID_INPUT`.
 
 ### 3.1 Respostas de erro
@@ -83,8 +84,11 @@ Erros retornam um objeto JSON com `code` para tratamento pelo React e `message` 
 | `400` | `INVALID_JSON` | Corpo com JSON malformado. |
 | `404` | `PROBE_NOT_FOUND` | O ID informado no movimento ou na consulta individual não existe. |
 | `409` | `OUT_OF_BOUNDS` | Um avanço ultrapassaria os limites da sonda. A sequência inteira é rejeitada. |
-| `422` | `INVALID_INPUT` | Corpo ou campo obrigatório ausente, tipo incorreto, limite fora de `0..100`, direção inválida, ou sequência com tamanho ou caracteres inválidos. |
+| `409` | `IDEMPOTENCY_CONFLICT` | A chave já confirmou um movimento da mesma sonda com comandos diferentes. |
+| `422` | `INVALID_INPUT` | Corpo ou campo obrigatório ausente, tipo incorreto, limite fora de `0..100`, direção inválida, sequência inválida ou chave de idempotência que não é um UUID. |
 | `503` | `DATABASE_BUSY` | A espera pelo acesso de escrita ao SQLite expirou. |
+
+Em atualizações separadas, publique primeiro o backend com suporte ao cabeçalho. A inicialização adiciona a tabela de movimentos confirmados ao banco existente. Preserve a tabela e o suporte ao cabeçalho enquanto clientes ainda puderem reenviar tentativas.
 
 O tratador de `RequestValidationError` traduz `json_invalid` para `400 INVALID_JSON` e as demais falhas de validação da entrada para `422 INVALID_INPUT`. Um teste de integração envia JSON malformado e confere o status e o formato do corpo. [Tratamento de erros do FastAPI](https://fastapi.tiangolo.com/tutorial/handling-errors/#override-request-validation-exceptions)
 

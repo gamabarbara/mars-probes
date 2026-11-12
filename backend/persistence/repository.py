@@ -1,8 +1,10 @@
+from dataclasses import replace
+
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from domain import Direction, Grid, Position, Probe, ProbeSortField
-from persistence.models import ProbeRecord
+from persistence.models import ConfirmedMoveRecord, ProbeRecord
 
 PROBE_SORT_COLUMNS = {
     ProbeSortField.ID: ProbeRecord.id,
@@ -53,6 +55,28 @@ class ProbeRepository:
             .where(ProbeRecord.id == probe.id)
             .values(
                 x=probe.position.x, y=probe.position.y, direction=probe.direction.value
+            )
+        )
+
+    def get_confirmed_move(self, probe: Probe, key: str) -> tuple[str, Probe] | None:
+        record = self.session.get(ConfirmedMoveRecord, (probe.id, key))
+        if record is None:
+            return None
+        return record.commands, replace(
+            probe,
+            position=Position(x=record.x, y=record.y),
+            direction=Direction(record.direction),
+        )
+
+    def record_confirmed_move(self, probe: Probe, key: str, commands: str) -> None:
+        self.session.add(
+            ConfirmedMoveRecord(
+                probe_id=probe.id,
+                key=key,
+                commands=commands,
+                x=probe.position.x,
+                y=probe.position.y,
+                direction=probe.direction.value,
             )
         )
 

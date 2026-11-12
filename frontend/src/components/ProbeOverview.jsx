@@ -11,11 +11,9 @@ function QueryError({ message, onRetry, label }) {
   );
 }
 
-export function ProbeOverview({ collectionRevision, detailRevision, selectedId, moving, onClearSelection }) {
+export function ProbeOverview({ collectionRevision, detail, selectedId, moving, onClearSelection }) {
   const collection = useProbeQuery("/probes", collectionRevision, "Could not load the probe map.");
-  const detailUrl = selectedId === null ? null : `/probes/${encodeURIComponent(selectedId)}`;
-  const detail = useProbeQuery(detailUrl, detailRevision, "Could not load the selected probe.");
-  const selected = detailUrl !== null && detail.status === "success" ? detail.data : null;
+  const selected = selectedId !== null && detail.status === "success" ? detail.data : null;
 
   return (
     <section className="space-y-4 rounded-xl border border-slate-200 p-5" aria-labelledby="probe-map-title">

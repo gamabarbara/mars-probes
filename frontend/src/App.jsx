@@ -3,13 +3,16 @@ import { LaunchForm } from "./components/LaunchForm.jsx";
 import { MoveForm } from "./components/MoveForm.jsx";
 import { ProbeList } from "./components/ProbeList.jsx";
 import { ProbeOverview } from "./components/ProbeOverview.jsx";
+import { useProbeQuery } from "./useProbeQuery.js";
 
 export function App() {
   const [launchCount, setLaunchCount] = useState(0);
-  const [moveCount, setMoveCount] = useState(0);
+  const [moveRevision, setMoveRevision] = useState(0);
   const [selectedId, setSelectedId] = useState(null);
   const [moving, setMoving] = useState(false);
-  const collectionRevision = launchCount + moveCount;
+  const collectionRevision = launchCount + moveRevision;
+  const detailUrl = selectedId === null ? null : `/probes/${encodeURIComponent(selectedId)}`;
+  const detail = useProbeQuery(detailUrl, moveRevision, "Could not load the selected probe.");
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
@@ -27,7 +30,7 @@ export function App() {
         <div className="min-w-0 space-y-6">
           <ProbeOverview
             collectionRevision={collectionRevision}
-            detailRevision={moveCount}
+            detail={detail}
             selectedId={selectedId}
             moving={moving}
             onClearSelection={() => setSelectedId(null)}
@@ -38,7 +41,8 @@ export function App() {
               probeId={selectedId}
               moving={moving}
               onMovingChange={setMoving}
-              onMoved={() => setMoveCount((count) => count + 1)}
+              detailLoading={detail.status === "loading"}
+              onRefresh={() => setMoveRevision((revision) => revision + 1)}
             />
           )}
         </div>

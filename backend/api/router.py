@@ -1,6 +1,10 @@
 from fastapi import APIRouter
 
-from api.error_handlers import ErrorResponse, OutOfBoundsResponse
+from api.error_handlers import (
+    ErrorResponse,
+    IdempotencyConflictResponse,
+    OutOfBoundsResponse,
+)
 from api.probes import (
     create_probe_commands_router,
     create_probe_detail_router,
@@ -42,8 +46,8 @@ def create_api_router(database: Database) -> APIRouter:
             **write_responses,
             404: probe_not_found,
             409: {
-                "model": OutOfBoundsResponse,
-                "description": "Command exceeds grid bounds",
+                "model": OutOfBoundsResponse | IdempotencyConflictResponse,
+                "description": "Command exceeds grid bounds or move key conflicts",
             },
         },
     )

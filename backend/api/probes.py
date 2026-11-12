@@ -1,6 +1,7 @@
 from typing import Annotated
+from uuid import UUID
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Header, Query
 
 from api.schemas import (
     CommandsRequest,
@@ -61,8 +62,19 @@ def create_probe_commands_router(database: Database) -> APIRouter:
     router = APIRouter()
 
     @router.post("/{id}/commands")
-    def execute_commands(id: str, request: CommandsRequest) -> ProbeResponse:
-        probe = move_probe(database, probe_id=id, commands=request.commands)
+    def execute_commands(
+        id: str,
+        request: CommandsRequest,
+        idempotency_key: Annotated[UUID | None, Header(alias="Idempotency-Key")] = None,
+    ) -> ProbeResponse:
+        probe = move_probe(
+            database,
+            probe_id=id,
+            commands=request.commands,
+            idempotency_key=str(idempotency_key)
+            if idempotency_key is not None
+            else None,
+        )
         return ProbeResponse.model_validate(probe)
 
     return router

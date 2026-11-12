@@ -4,7 +4,10 @@ import { afterEach, expect, test, vi } from "vitest";
 
 import { App } from "./App.jsx";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  sessionStorage.clear();
+});
 
 const first = { id: "probe-1", x: 0, y: 0, direction: "NORTH" };
 const second = { ...first, id: "probe-2", direction: "WEST" };
@@ -200,7 +203,7 @@ test("refreshes the same page and highlights the confirmed position without doub
   await user.click(switchProbe);
   expect(fetchMock).toHaveBeenCalledExactlyOnceWith("/probes/probe-1/commands", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "Idempotency-Key": expect.any(String) },
     body: JSON.stringify({ commands: "MRM" }),
   });
 
@@ -217,4 +220,72 @@ test("refreshes the same page and highlights the confirmed position without doub
     "/probes/probe-1",
     "/probes?limit=21&offset=20&sort_by=x&order=asc",
   ]);
+});
+
+test("refreshes after a lost move response and retries the same move after remount", async () => {
+  const probes = [first];
+  const confirmedMoves = new Map();
+  let resolveDetail;
+  const fetchMock = mockApi(probes, (url, options) => {
+    if (url === "/probes/probe-1") {
+      if (probes[0].y === 1 && !resolveDetail) {
+        return new Promise((resolve) => { resolveDetail = resolve; });
+      }
+      return Response.json({ ...firstDetail, ...probes[0] });
+    }
+    if (url !== "/probes/probe-1/commands" || options?.method !== "POST") return;
+
+    const key = options.headers["Idempotency-Key"];
+    if (confirmedMoves.has(key)) return Response.json(confirmedMoves.get(key));
+    const moved = { ...probes[0], y: probes[0].y + 1 };
+    probes[0] = moved;
+    confirmedMoves.set(key, moved);
+    if (moved.y === 1) throw new TypeError("Failed to fetch");
+    return Response.json(moved);
+  });
+  const user = userEvent.setup();
+  const { unmount } = render(<App />);
+
+  await screen.findByRole("table");
+  await selectProbe(user, first.id);
+  await screen.findByText("Cell (0, 0): 1 probe, selected probe facing North");
+  const form = screen.getByRole("form", { name: "Move probe" });
+  const commands = within(form).getByRole("textbox", { name: "Commands" });
+  await user.type(commands, "M");
+  await user.click(within(form).getByRole("button", { name: "Send commands" }));
+
+  expect((await within(form).findByRole("alert")).textContent).toBe("Could not confirm whether the probe moved.");
+  expect(within(form).getByRole("button", { name: "Retry move" }).disabled).toBe(true);
+  expect(commands.disabled).toBe(true);
+  await act(async () => resolveDetail(Response.json({ ...firstDetail, ...probes[0] })));
+  await screen.findByText("Cell (0, 1): 1 probe, selected probe facing North");
+  expect(within(form).getByRole("button", { name: "Retry move" }).disabled).toBe(false);
+
+  unmount();
+  render(<App />);
+  await screen.findByRole("table");
+  await selectProbe(user, first.id);
+  await screen.findByText("Cell (0, 1): 1 probe, selected probe facing North");
+  const restoredForm = screen.getByRole("form", { name: "Move probe" });
+  const restoredCommands = within(restoredForm).getByRole("textbox", { name: "Commands" });
+  expect(restoredCommands.value).toBe("M");
+  await user.click(within(restoredForm).getByRole("button", { name: "Retry move" }));
+  expect((await within(restoredForm).findByRole("status")).textContent).toContain("Position: (0, 1)");
+  await screen.findByText("Cell (0, 1): 1 probe, selected probe facing North");
+  expect(restoredCommands.value).toBe("");
+
+  await user.type(restoredCommands, "M");
+  await user.click(within(restoredForm).getByRole("button", { name: "Send commands" }));
+  expect(await screen.findByText("Cell (0, 2): 1 probe, selected probe facing North")).toBeTruthy();
+  const attempts = fetchMock.mock.calls
+    .filter(([url, options]) => url === "/probes/probe-1/commands" && options?.method === "POST")
+    .map(([, options]) => ({
+      key: options.headers["Idempotency-Key"],
+      commands: JSON.parse(options.body).commands,
+    }));
+  expect(attempts.map(({ commands }) => commands)).toEqual(["M", "M", "M"]);
+  expect(attempts[0].key).toEqual(expect.any(String));
+  expect(attempts[1]).toEqual(attempts[0]);
+  expect(attempts[2].key).toEqual(expect.any(String));
+  expect(attempts[2].key).not.toBe(attempts[0].key);
 });

@@ -1,3 +1,5 @@
+from typing import Literal
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -5,7 +7,7 @@ from pydantic import BaseModel
 
 from domain import OutOfBoundsError
 from persistence.database import DatabaseBusyError
-from probe_service import ProbeNotFoundError
+from probe_service import IdempotencyConflictError, ProbeNotFoundError
 
 
 class ErrorResponse(BaseModel):
@@ -15,6 +17,10 @@ class ErrorResponse(BaseModel):
 
 class OutOfBoundsResponse(ErrorResponse):
     step: int
+
+
+class IdempotencyConflictResponse(ErrorResponse):
+    code: Literal["IDEMPOTENCY_CONFLICT"] = "IDEMPOTENCY_CONFLICT"
 
 
 def register_error_handlers(app: FastAPI) -> None:
@@ -46,6 +52,15 @@ def register_error_handlers(app: FastAPI) -> None:
             code="OUT_OF_BOUNDS",
             message=f"The command at step {error.step} would move the probe outside the grid.",
             step=error.step,
+        )
+        return JSONResponse(status_code=409, content=body.model_dump())
+
+    @app.exception_handler(IdempotencyConflictError)
+    async def idempotency_conflict(
+        _: Request, __: IdempotencyConflictError
+    ) -> JSONResponse:
+        body = IdempotencyConflictResponse(
+            message="This move key was already used with different commands.",
         )
         return JSONResponse(status_code=409, content=body.model_dump())
 
