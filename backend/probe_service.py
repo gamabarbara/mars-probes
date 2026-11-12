@@ -1,8 +1,22 @@
 from uuid import uuid4
 
-from domain import Direction, Grid, Probe
+from domain import Direction, Grid, Probe, ProbeSortField
 from persistence.database import Database
 from persistence.repository import ProbeRepository
+
+
+def list_probes(
+    database: Database,
+    *,
+    limit: int | None,
+    offset: int,
+    sort_by: ProbeSortField,
+    descending: bool,
+) -> list[Probe]:
+    with database.read_session() as session:
+        return ProbeRepository(session).list_probes(
+            limit=limit, offset=offset, sort_by=sort_by, descending=descending
+        )
 
 
 def launch_probe(

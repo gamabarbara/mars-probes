@@ -6,7 +6,7 @@ from pathlib import Path
 from fastapi import FastAPI
 
 from api.error_handlers import ErrorResponse, register_error_handlers
-from api.probes import create_probe_router
+from api.probes import create_probe_launch_router, create_probe_query_router
 from persistence.database import Database
 
 
@@ -20,11 +20,19 @@ def create_app(database_path: Path) -> FastAPI:
 
     app = FastAPI(title="Mars Probes API", lifespan=lifespan)
     register_error_handlers(app)
+    probe_prefix = "/probes"
+    invalid_input = {"model": ErrorResponse, "description": "Invalid request input"}
     app.include_router(
-        create_probe_router(database),
+        create_probe_query_router(database),
+        prefix=probe_prefix,
+        responses={422: invalid_input},
+    )
+    app.include_router(
+        create_probe_launch_router(database),
+        prefix=probe_prefix,
         responses={
             400: {"model": ErrorResponse, "description": "Malformed JSON"},
-            422: {"model": ErrorResponse, "description": "Invalid request input"},
+            422: invalid_input,
             503: {"model": ErrorResponse, "description": "Database write timed out"},
         },
     )

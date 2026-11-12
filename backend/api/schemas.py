@@ -1,8 +1,8 @@
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import AliasPath, BaseModel, ConfigDict, Field
 
-from domain import MAX_GRID_COORDINATE, Direction
+from domain import MAX_GRID_COORDINATE, Direction, ProbeSortField
 
 GridLimit = Annotated[int, Field(strict=True, ge=0, le=MAX_GRID_COORDINATE)]
 
@@ -13,6 +13,13 @@ class LaunchRequest(BaseModel):
     direction: Direction
 
 
+class ProbeListQuery(BaseModel):
+    limit: int | None = Field(default=None, ge=1, le=100)
+    offset: int = Field(default=0, ge=0, le=2**63 - 1)
+    sort_by: ProbeSortField = ProbeSortField.ID
+    order: Literal["asc", "desc"] = "asc"
+
+
 class ProbeResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True, validate_by_name=True)
 
@@ -20,3 +27,7 @@ class ProbeResponse(BaseModel):
     x: int = Field(validation_alias=AliasPath("position", "x"))
     y: int = Field(validation_alias=AliasPath("position", "y"))
     direction: Direction
+
+
+class ProbeListResponse(BaseModel):
+    probes: list[ProbeResponse]

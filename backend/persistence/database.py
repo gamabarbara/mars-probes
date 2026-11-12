@@ -33,6 +33,11 @@ class Database:
         Base.metadata.create_all(self.engine)
 
     @contextmanager
+    def read_session(self) -> Iterator[Session]:
+        with Session(self.engine) as session:
+            yield session
+
+    @contextmanager
     def transaction(self) -> Iterator[Session]:
         try:
             with Session(self.engine) as session, session.begin():

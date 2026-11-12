@@ -12,6 +12,13 @@ class Direction(StrEnum):
     WEST = "WEST"
 
 
+class ProbeSortField(StrEnum):
+    ID = "id"
+    X = "x"
+    Y = "y"
+    DIRECTION = "direction"
+
+
 @dataclass(frozen=True)
 class Position:
     x: int

@@ -1,12 +1,33 @@
-from fastapi import APIRouter
+from typing import Annotated
 
-from api.schemas import LaunchRequest, ProbeResponse
+from fastapi import APIRouter, Query
+
+from api.schemas import LaunchRequest, ProbeListQuery, ProbeListResponse, ProbeResponse
 from persistence.database import Database
-from probe_service import launch_probe
+from probe_service import launch_probe, list_probes
 
 
-def create_probe_router(database: Database) -> APIRouter:
-    router = APIRouter(prefix="/probes")
+def create_probe_query_router(database: Database) -> APIRouter:
+    router = APIRouter()
+
+    @router.get("")
+    def list_all(query: Annotated[ProbeListQuery, Query()]) -> ProbeListResponse:
+        probes = list_probes(
+            database,
+            limit=query.limit,
+            offset=query.offset,
+            sort_by=query.sort_by,
+            descending=query.order == "desc",
+        )
+        return ProbeListResponse(
+            probes=[ProbeResponse.model_validate(probe) for probe in probes],
+        )
+
+    return router
+
+
+def create_probe_launch_router(database: Database) -> APIRouter:
+    router = APIRouter()
 
     @router.post("", status_code=201)
     def launch(request: LaunchRequest) -> ProbeResponse:
