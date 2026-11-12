@@ -21,8 +21,8 @@
 - `backend/api/schemas.py` defines the HTTP request and response models and validates probe requests.
 - `backend/probe_service.py` executes probe use cases and controls transaction boundaries. All reads and writes of an atomic use case share the same session.
 - `backend/persistence/database.py` configures SQLite and owns transaction contexts. `backend/persistence/repository.py` executes persistence operations using the session supplied by the service. `backend/persistence/models.py` maps SQLite tables and constraints. Keep ORM models separate from domain models.
-- `frontend/src/main.jsx` mounts React. `frontend/src/App.jsx` composes the application UI.
-- `frontend/src/components/LaunchForm.jsx` handles form input and UI state. Send requests through the relative API path configured in `frontend/vite.config.js`. The backend enforces domain rules.
+- `frontend/src/main.tsx` mounts React. `frontend/src/App.tsx` composes the application UI.
+- `frontend/src/components/LaunchForm.tsx` handles form input and UI state. Send requests through the relative API path configured in `frontend/vite.config.ts`. The backend enforces domain rules.
 - Keep code identifiers, error messages, and all frontend copy in English.
 
 ## Run and verify
@@ -32,7 +32,9 @@ Run these commands from the repository root. See [README.md](README.md) for prer
 | Task | Command |
 | --- | --- |
 | Start both services | `docker compose up --build` |
+| Lint the backend | `uv --directory backend run --locked ruff check .` |
 | Test the backend | `uv --directory backend run --locked pytest` |
+| Lint the frontend | `npm --prefix frontend run lint` |
 | Test the frontend | `npm --prefix frontend test` |
 | Build the frontend | `npm --prefix frontend run build` |
 

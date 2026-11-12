@@ -1,13 +1,17 @@
 import { useState } from "react";
 
-import { directionLabels } from "../directionLabels.js";
-import { useProbeQuery } from "../useProbeQuery.js";
+import { directionLabels } from "../directionLabels";
+import { useProbeQuery } from "../useProbeQuery";
+
+import type { ProbeListResponse, ProbeSelectionProps } from "../probeTypes";
 
 const pageSize = 20;
-const selectClass = "mt-1 w-full rounded-md border border-slate-400 bg-white px-3 py-2";
-const buttonClass = "rounded-md border border-slate-400 px-3 py-2 text-sm font-semibold disabled:opacity-50";
+const selectClass = "mission-field";
+const buttonClass = "mission-button";
 
-export function ProbeList({ revision, selectedId, moving, onSelect }) {
+type ProbeListProps = ProbeSelectionProps & { revision: number };
+
+export function ProbeList({ revision, selectedId, moving, onSelect }: ProbeListProps) {
   const [page, setPage] = useState(0);
   const [sortBy, setSortBy] = useState("id");
   const [order, setOrder] = useState("asc");
@@ -17,16 +21,17 @@ export function ProbeList({ revision, selectedId, moving, onSelect }) {
     sort_by: sortBy,
     order,
   });
-  const { status, data, message, retry } = useProbeQuery(
+  const queryResult = useProbeQuery<ProbeListResponse>(
     `/probes?${query}`, revision, "Could not load the probes.",
   );
-  const probes = data?.probes ?? [];
+  const { status, retry } = queryResult;
+  const probes = status === "success" ? queryResult.data.probes : [];
   const hasNextPage = status === "success" && probes.length > pageSize;
 
   return (
-    <section className="rounded-xl border border-slate-200 p-5" aria-labelledby="probe-list-title">
-      <h2 id="probe-list-title" className="text-xl font-semibold">Launched probes</h2>
-      <div className="my-4 grid gap-3 sm:grid-cols-2">
+    <section className="mission-panel fleet-panel" aria-labelledby="probe-list-title">
+      <div className="panel-heading"><h2 id="probe-list-title">Probe fleet</h2></div>
+      <div className="fleet-filters">
         <label className="text-sm font-medium">
           Sort by
           <select className={selectClass} value={sortBy} onChange={(event) => {
@@ -50,35 +55,35 @@ export function ProbeList({ revision, selectedId, moving, onSelect }) {
           </select>
         </label>
       </div>
-      {status === "loading" && <p role="status">Loading probes…</p>}
+      {status === "loading" && <p className="panel-body muted" role="status">Loading probes…</p>}
       {status === "error" && (
-        <div className="space-y-2">
-          <p lang="en" role="alert" className="text-red-800">{message}</p>
+        <div className="panel-body space-y-2">
+          <p lang="en" role="alert" className="mission-error">{queryResult.message}</p>
           <button type="button" className={buttonClass} onClick={retry}>
             Try again
           </button>
         </div>
       )}
       {status === "success" && probes.length === 0 && (
-        <p role="status">{page === 0 ? "No probes launched." : "No probes on this page."}</p>
+        <p className="panel-body muted" role="status">{page === 0 ? "No probes launched." : "No probes on this page."}</p>
       )}
       {status === "success" && probes.length > 0 && (
-        <table className="w-full text-left text-sm" aria-labelledby="probe-list-title">
-          <thead className="border-b border-slate-300">
+        <table className="fleet-table" aria-labelledby="probe-list-title">
+          <thead>
             <tr>
-              <th scope="col" className="py-2 pr-3">ID</th>
-              <th scope="col" className="py-2 pr-3">Position</th>
-              <th scope="col" className="py-2 pr-3">Direction</th>
-              <th scope="col" className="py-2"><span className="sr-only">Actions</span></th>
+              <th scope="col">ID</th>
+              <th scope="col">Position</th>
+              <th scope="col">Direction</th>
+              <th scope="col"><span className="sr-only">Actions</span></th>
             </tr>
           </thead>
           <tbody>
             {probes.slice(0, pageSize).map(({ id, x, y, direction }) => (
-              <tr key={id} className={`border-b border-slate-200${selectedId === id ? " bg-sky-50" : ""}`}>
-                <td className="py-2 pr-3 wrap-anywhere">{id}</td>
-                <td className="py-2 pr-3 whitespace-nowrap">({x}, {y})</td>
-                <td className="py-2 pr-3">{directionLabels[direction]}</td>
-                <td className="py-2">
+              <tr key={id} className={selectedId === id ? "fleet-selected" : undefined}>
+                <td className="probe-id">{id}</td>
+                <td className="fleet-position">({x}, {y})</td>
+                <td>{directionLabels[direction]}</td>
+                <td>
                   <button
                     type="button"
                     className={buttonClass}
@@ -95,7 +100,7 @@ export function ProbeList({ revision, selectedId, moving, onSelect }) {
           </tbody>
         </table>
       )}
-      <nav aria-label="Probe pagination" className="mt-4 flex items-center justify-between gap-2">
+      <nav aria-label="Probe pagination" className="fleet-pagination">
         <button type="button" className={buttonClass} disabled={page === 0 || status === "loading"} onClick={() => setPage(page - 1)}>
           Previous
         </button>

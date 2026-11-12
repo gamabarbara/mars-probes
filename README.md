@@ -26,8 +26,11 @@ Com uv, Python 3.13 e Node.js 24 instalados, rode os comandos na raiz do projeto
 
 ```sh
 uv --directory backend sync --locked --python 3.13
+uv --directory backend run --locked ruff check .
 uv --directory backend run --locked pytest
 npm --prefix frontend ci
+npm --prefix frontend run lint
 npm --prefix frontend test
+npm --prefix frontend run typecheck
 npm --prefix frontend run build
 ```

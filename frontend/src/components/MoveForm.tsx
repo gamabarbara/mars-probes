@@ -1,23 +1,37 @@
 import { useState } from "react";
+import type { FormEvent } from "react";
 
-import { directionLabels } from "../directionLabels.js";
+import { directionLabels } from "../directionLabels";
+
+import type { ApiError, Probe } from "../probeTypes";
+
+type PendingMove = { key: string; commands: string };
+type MoveFormProps = {
+  probeId: string;
+  moving?: boolean;
+  onMovingChange: (moving: boolean) => void;
+  detailLoading?: boolean;
+  onRefresh: () => void;
+};
 
 const uncertainMove = "Could not confirm whether the probe moved.";
 
-function readPendingMove(storageKey) {
+function readPendingMove(storageKey: string): PendingMove | null {
   try {
-    return JSON.parse(sessionStorage.getItem(storageKey));
+    const value = sessionStorage.getItem(storageKey);
+    return value === null ? null : JSON.parse(value);
   } catch {
     return null;
   }
 }
 
-export function MoveForm({ probeId, moving, onMovingChange, detailLoading, onRefresh }) {
+export function MoveForm({ probeId, moving, onMovingChange, detailLoading, onRefresh }: MoveFormProps) {
   const storageKey = `mars-probes:pending-move:${probeId}`;
   const [pending, setPending] = useState(() => readPendingMove(storageKey));
   const [commands, setCommands] = useState(pending?.commands ?? "");
-  const [error, setError] = useState(null);
-  const [position, setPosition] = useState(null);
+  const [error, setError] = useState<string | null>(null);
+  const [position, setPosition] = useState<Probe | null>(null);
+  const editDisabled = moving || pending !== null;
   const submitDisabled = moving || (pending !== null && detailLoading);
 
   function clearPending() {
@@ -25,7 +39,7 @@ export function MoveForm({ probeId, moving, onMovingChange, detailLoading, onRef
     setPending(null);
   }
 
-  async function handleSubmit(event) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (submitDisabled) return;
 
@@ -56,7 +70,7 @@ export function MoveForm({ probeId, moving, onMovingChange, detailLoading, onRef
         body: JSON.stringify({ commands: attempt.commands }),
       });
       if (!response.ok) {
-        const body = await response.json().catch(() => null);
+        const body: ApiError | null = await response.json().catch(() => null);
         if (response.status >= 400 && response.status < 500) {
           clearPending();
           setError(body?.message || "Could not move the probe.");
@@ -67,7 +81,7 @@ export function MoveForm({ probeId, moving, onMovingChange, detailLoading, onRef
         return;
       }
 
-      const result = await response.json();
+      const result: Probe | null = await response.json();
       if (result?.id !== probeId || !Number.isInteger(result.x) ||
           !Number.isInteger(result.y) || !Object.hasOwn(directionLabels, result.direction)) {
         throw new Error("Invalid move response");
@@ -85,35 +99,43 @@ export function MoveForm({ probeId, moving, onMovingChange, detailLoading, onRef
   }
 
   return (
-    <form className="space-y-3 rounded-xl border border-slate-200 p-5" aria-labelledby="move-title" onSubmit={handleSubmit}>
-      <h3 id="move-title" className="font-semibold">Move probe</h3>
-      <p className="wrap-anywhere text-sm">ID: {probeId}</p>
-      <label htmlFor="probe-commands" className="block text-sm font-medium">Commands</label>
+    <form className="move-form" aria-label="Move probe" onSubmit={handleSubmit}>
+      <label htmlFor="probe-commands">Commands</label>
       <textarea
         id="probe-commands"
-        className="w-full rounded-md border border-slate-400 bg-white px-3 py-2"
+        className="mission-field"
         rows={2}
         value={commands}
         onChange={(event) => setCommands(event.target.value)}
         aria-describedby="commands-help"
         autoCapitalize="off"
         spellCheck={false}
-        disabled={moving || pending !== null}
+        disabled={editDisabled}
+        placeholder="e.g. MRM"
       />
-      <p id="commands-help" className="text-sm text-slate-600">
-        Enter 1 to 1000 uppercase commands without spaces. L turns left, R turns right, and M moves forward.
+      <p id="commands-help" className="muted text-sm">
+        Use 1 to 1000 uppercase commands without spaces.
       </p>
+      <div role="group" aria-label="Add a command" className="command-keys">
+        {[["L", "Left"], ["M", "Move"], ["R", "Right"]].map(([command, label]) => (
+          <button key={command} type="button" className="mission-button"
+            disabled={editDisabled || commands.length >= 1000}
+            onClick={() => setCommands((value) => value + command)}>
+            <kbd>{command}</kbd> {label}
+          </button>
+        ))}
+      </div>
       <button
         type="submit"
         disabled={submitDisabled}
-        className="rounded-md bg-slate-900 px-4 py-2 font-semibold text-white disabled:opacity-60"
+        className="mission-button primary"
       >
         {moving ? "Sending…" : pending ? "Retry move" : "Send commands"}
       </button>
-      {error && <p lang="en" role="alert" className="text-red-800">{error}</p>}
+      {error && <p lang="en" role="alert" className="mission-error">{error}</p>}
       {pending && !moving && !error && <p role="status">{uncertainMove}</p>}
       {position && (
-        <p role="status" className="rounded-md bg-emerald-50 p-3 text-emerald-950">
+        <p role="status" className="mission-success">
           Move confirmed. Position: ({position.x}, {position.y}) · Direction: {directionLabels[position.direction]}
         </p>
       )}

@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, expect, test, vi } from "vitest";
 
-import { MoveForm } from "./MoveForm.jsx";
+import { MoveForm } from "./MoveForm";
 
 afterEach(() => {
   cleanup();
@@ -16,8 +16,8 @@ test.each(["", "m", "M M", "M\n", "M".repeat(1001)])(
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
-    render(<MoveForm probeId="probe-1" onMovingChange={vi.fn()} />);
-    fireEvent.change(screen.getByRole("textbox", { name: "Commands" }), { target: { value } });
+    render(<MoveForm probeId="probe-1" onMovingChange={vi.fn()} onRefresh={vi.fn()} />);
+    fireEvent.change(screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Commands" }), { target: { value } });
     await user.click(screen.getByRole("button", { name: "Send commands" }));
 
     expect(screen.getByRole("alert").textContent).toBe(
@@ -40,20 +40,19 @@ test.each([
   const user = userEvent.setup();
   const onRefresh = vi.fn();
   const { rerender } = render(<MoveForm key="probe-1" probeId="probe-1" onMovingChange={vi.fn()} onRefresh={onRefresh} />);
-  await user.type(screen.getByRole("textbox", { name: "Commands" }), "RMM");
+  await user.type(screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Commands" }), "RMM");
   await user.click(screen.getByRole("button", { name: "Send commands" }));
 
   expect((await screen.findByRole("alert")).textContent).toBe(message);
-  const commands = screen.getByRole("textbox", { name: "Commands" });
+  const commands = screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Commands" });
   expect(commands.value).toBe("RMM");
   expect(commands.disabled).toBe(pending);
-  expect(screen.getByRole("button", { name: pending ? "Retry move" : "Send commands" }).disabled).toBe(false);
+  expect(screen.getByRole("button", { name: pending ? "Retry move" : "Send commands" }).matches(":disabled")).toBe(false);
   expect(onRefresh).toHaveBeenCalledTimes(pending ? 1 : 0);
   expect(fetchMock).toHaveBeenCalledTimes(1);
 
-  rerender(<MoveForm key="probe-2" probeId="probe-2" onMovingChange={vi.fn()} />);
-  expect(screen.getByText("ID: probe-2")).toBeTruthy();
-  expect(screen.getByRole("textbox", { name: "Commands" }).value).toBe("");
+  rerender(<MoveForm key="probe-2" probeId="probe-2" onMovingChange={vi.fn()} onRefresh={vi.fn()} />);
+  expect(screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Commands" }).value).toBe("");
   expect(screen.queryByRole("alert")).toBeNull();
 });
 
@@ -64,8 +63,8 @@ test("does not send a move when the tab cannot save its key", async () => {
   const fetchMock = vi.fn();
   vi.stubGlobal("fetch", fetchMock);
   const user = userEvent.setup();
-  render(<MoveForm probeId="probe-1" onMovingChange={vi.fn()} />);
-  await user.type(screen.getByRole("textbox", { name: "Commands" }), "M");
+  render(<MoveForm probeId="probe-1" onMovingChange={vi.fn()} onRefresh={vi.fn()} />);
+  await user.type(screen.getByRole<HTMLTextAreaElement>("textbox", { name: "Commands" }), "M");
   await user.click(screen.getByRole("button", { name: "Send commands" }));
 
   expect(screen.getByRole("alert").textContent).toBe("Could not save this move in this tab. Try again.");
