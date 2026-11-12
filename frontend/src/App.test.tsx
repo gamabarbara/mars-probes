@@ -14,6 +14,7 @@ const first: Probe = { id: "probe-1", x: 0, y: 0, direction: "NORTH" };
 const second: Probe = { ...first, id: "probe-2", direction: "WEST" };
 const firstDetail = { ...first, max_x: 3, max_y: 5 };
 const secondDetail = { ...second, max_x: 7, max_y: 2 };
+const firstMapPage = "/probes?limit=100&offset=0";
 
 type MockRequest = Omit<RequestInit, "headers"> & { headers?: Record<string, string> };
 type MockHandler = (url: string, options: MockRequest) => Response | Promise<Response> | undefined;
@@ -22,7 +23,6 @@ function mockApi(probes: Probe[], handle: MockHandler = () => undefined) {
   const fetchMock = vi.fn(async (url: string, options: MockRequest) => {
     const response = handle(url, options);
     if (response !== undefined) return response;
-    if (url === "/probes") return Response.json({ probes });
     if (url.startsWith("/probes?")) {
       const query = new URLSearchParams(url.split("?")[1]);
       const offset = Number(query.get("offset"));
@@ -98,7 +98,7 @@ test("cycles through probes sharing a map cell by ID and keeps keyboard focus", 
 });
 
 test("maps probes from every page and keeps selection when paging or sorting", async () => {
-  const probes = [first, second, ...Array.from({ length: 18 }, (_, i) => ({
+  const probes = [first, second, ...Array.from({ length: 98 }, (_, i) => ({
     ...first, id: "additional-" + i, x: 2, y: 2,
   })), { ...first, id: "last-probe", x: 8, y: 1 }];
   const fetchMock = mockApi(probes);
@@ -111,6 +111,7 @@ test("maps probes from every page and keeps selection when paging or sorting", a
   expect(overlap.closest("[role=listitem]")?.querySelector(".marker-glyph")?.textContent).toBe("2");
   expect(screen.getByText("Cell (8, 1): 1 probe")).toBeTruthy();
   expect(screen.getByText("Map bounds: (0, 0) to (8, 2)")).toBeTruthy();
+  expect(fetchMock).toHaveBeenCalledWith("/probes?limit=100&offset=100", expect.anything());
 
   await selectProbe(user, first.id);
   expect(await screen.findByText("Cell (0, 0): 2 probes, selected probe facing North")).toBeTruthy();
@@ -120,7 +121,7 @@ test("maps probes from every page and keeps selection when paging or sorting", a
 
   fetchMock.mockClear();
   await user.click(screen.getByRole("button", { name: "Next" }));
-  expect(await screen.findByText("last-probe")).toBeTruthy();
+  expect(await screen.findByText("additional-18")).toBeTruthy();
   await user.selectOptions(screen.getByLabelText("Sort by"), "x");
   await screen.findByRole("button", { name: "Select probe probe-1" });
   expect(screen.getByText("Cell (0, 0): 2 probes, selected probe facing North")).toBeTruthy();
@@ -166,7 +167,7 @@ test("retries map and detail independently and keeps the overview after detail f
   let mapReads = 0;
   let detailReads = 0;
   const fetchMock = mockApi([first, second], (url) => {
-    if (url === "/probes" && ++mapReads === 1) {
+    if (url === firstMapPage && ++mapReads === 1) {
       return Response.json({ message: "Map unavailable." }, { status: 503 });
     }
     if (url === "/probes/probe-1" && ++detailReads === 1) {
@@ -180,7 +181,7 @@ test("retries map and detail independently and keeps the overview after detail f
   fetchMock.mockClear();
   await user.click(screen.getByRole("button", { name: "Retry map" }));
   expect(await screen.findByText("Cell (0, 0): 2 probes")).toBeTruthy();
-  expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(["/probes"]);
+  expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([firstMapPage]);
 
   await selectProbe(user, second.id);
   expect(await screen.findByText("Cell (0, 0): 2 probes, selected probe facing West")).toBeTruthy();
@@ -206,7 +207,7 @@ test("refreshes the same page and highlights the confirmed position without doub
       return new Promise<Response>((resolve) => { resolveMove = resolve; });
     }
     if (confirmed && url === "/probes/probe-1") return Response.json({ ...firstDetail, ...moved });
-    if (confirmed && url.startsWith("/probes?")) return Response.json({ probes: probes.slice(-1) });
+    if (confirmed && url.startsWith("/probes?limit=21&")) return Response.json({ probes: probes.slice(-1) });
   });
   const user = userEvent.setup();
   render(<App />);
@@ -250,8 +251,8 @@ test("refreshes the same page and highlights the confirmed position without doub
   expect(await screen.findByText("Cell (1, 1): 1 probe, selected probe facing East")).toBeTruthy();
   expect(screen.getByText("Cell (0, 0): 1 probe")).toBeTruthy();
   expect(fetchMock.mock.calls.slice(1).map(([url]) => url).sort()).toEqual([
-    "/probes",
     "/probes/probe-1",
+    firstMapPage,
     "/probes?limit=21&offset=20&sort_by=x&order=asc",
   ]);
 });

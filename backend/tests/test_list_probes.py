@@ -5,9 +5,10 @@ from sqlite3 import connect
 import pytest
 from fastapi.testclient import TestClient
 
-from api.probes import get_database
+from api.probes_rest import get_probe_service
 from main import create_app
 from persistence import database as database_module
+from probe_service import ProbeService
 
 
 def test_lists_no_probes_before_first_launch(tmp_path: Path) -> None:
@@ -18,18 +19,19 @@ def test_lists_no_probes_before_first_launch(tmp_path: Path) -> None:
     assert response.json() == {"probes": []}
 
 
-def test_database_dependency_can_be_overridden(tmp_path: Path) -> None:
+def test_probe_service_dependency_can_be_overridden(tmp_path: Path) -> None:
     app = create_app(tmp_path / "probes.sqlite3")
     replacement = database_module.Database(tmp_path / "replacement.sqlite3")
     replacement.initialize()
-    app.dependency_overrides[get_database] = lambda: replacement
+    service = ProbeService(replacement)
+    app.dependency_overrides[get_probe_service] = lambda: service
 
     with TestClient(app) as client:
         launched = client.post("/probes", json={"x": 2, "y": 4, "direction": "EAST"})
         assert launched.status_code == 201
         assert client.get("/probes").json() == {"probes": [launched.json()]}
 
-        del app.dependency_overrides[get_database]
+        del app.dependency_overrides[get_probe_service]
         assert client.get("/probes").json() == {"probes": []}
 
 
@@ -76,6 +78,23 @@ def test_lists_committed_position_while_another_connection_writes(
     assert response.json() == {
         "probes": [{"id": "existing", "x": 2, "y": 3, "direction": "WEST"}]
     }
+
+
+def test_list_defaults_to_twenty_probes(tmp_path: Path) -> None:
+    path = tmp_path / "probes.sqlite3"
+    ids = [f"probe-{index:02}" for index in range(23)]
+    with TestClient(create_app(path)) as client, closing(connect(path)) as writer:
+        writer.executemany(
+            "INSERT INTO probes (id, x, y, direction, max_x, max_y) VALUES (?, 0, 0, 'NORTH', 0, 0)",
+            [(probe_id,) for probe_id in ids],
+        )
+        writer.commit()
+        first_page = client.get("/probes")
+        next_page = client.get("/probes", params={"offset": 20})
+
+    assert first_page.status_code == next_page.status_code == 200
+    assert [probe["id"] for probe in first_page.json()["probes"]] == ids[:20]
+    assert [probe["id"] for probe in next_page.json()["probes"]] == ids[20:]
 
 
 @pytest.mark.parametrize(
@@ -140,6 +159,9 @@ def test_list_documents_query_parameters_and_responses(tmp_path: Path) -> None:
         "sort_by",
         "order",
     }
+    limit = next(parameter for parameter in operation["parameters"] if parameter["name"] == "limit")
+    assert limit["required"] is False
+    assert limit["schema"]["default"] == 20
     responses = operation["responses"]
     assert responses.keys() == {"200", "422"}
     assert responses["422"]["content"]["application/json"]["schema"] == {

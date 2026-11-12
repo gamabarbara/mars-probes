@@ -10,7 +10,7 @@ from domain import Direction, Grid, Probe
 from persistence.database import Database
 from persistence.models import ProbeRecord
 from persistence.repository import ProbeRepository
-from probe_service import move_probe
+from probe_service import ProbeService
 
 
 def test_repository_preserves_legacy_database(tmp_path: Path) -> None:
@@ -40,10 +40,11 @@ def test_repository_preserves_legacy_database(tmp_path: Path) -> None:
             "SELECT x, y, direction FROM probes WHERE id = ?", ("new",)
         ).fetchone() == (0, 0, "NORTH")
 
-    moved = move_probe(store, probe_id="existing", commands="M", idempotency_key="key")
+    service = ProbeService(store)
+    moved = service.move_probe(probe_id="existing", commands="M", idempotency_key="key")
     assert moved.position.x == 1
     assert (
-        move_probe(store, probe_id="existing", commands="M", idempotency_key="key")
+        service.move_probe(probe_id="existing", commands="M", idempotency_key="key")
         == moved
     )
 

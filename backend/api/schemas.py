@@ -20,7 +20,7 @@ class CommandsRequest(BaseModel):
 
 
 class ProbeListQuery(BaseModel):
-    limit: int | None = Field(default=None, ge=1, le=100)
+    limit: int = Field(default=20, ge=1, le=100)
     offset: int = Field(default=0, ge=0, le=2**63 - 1)
     sort_by: ProbeSortField = ProbeSortField.ID
     order: Literal["asc", "desc"] = "asc"

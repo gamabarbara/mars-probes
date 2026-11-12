@@ -30,7 +30,7 @@ class ProbeRepository:
     def list_probes(
         self,
         *,
-        limit: int | None,
+        limit: int,
         offset: int,
         sort_by: ProbeSortField,
         descending: bool,

@@ -5,7 +5,20 @@ import { useProbeQuery } from "../useProbeQuery";
 import { ProbeMap } from "./ProbeMap";
 
 import type { ProbeQuery } from "../useProbeQuery";
-import type { ProbeDetail, ProbeListResponse, ProbeSelectionProps } from "../probeTypes";
+import type { Probe, ProbeDetail, ProbeListResponse, ProbeSelectionProps } from "../probeTypes";
+
+const MAP_PAGE_SIZE = 100;
+
+async function loadMapProbes(
+  url: string, read: (url: string) => Promise<ProbeListResponse>,
+): Promise<ProbeListResponse> {
+  const probes: Probe[] = [];
+  for (let offset = 0; ; offset += MAP_PAGE_SIZE) {
+    const page = await read(`${url}?limit=${MAP_PAGE_SIZE}&offset=${offset}`);
+    probes.push(...page.probes);
+    if (page.probes.length < MAP_PAGE_SIZE) return { probes };
+  }
+}
 
 type QueryErrorProps = { message: string; onRetry: () => void; label: string };
 
@@ -24,7 +37,7 @@ type ProbeOverviewProps = ProbeSelectionProps & {
 };
 
 export function ProbeOverview({ collectionRevision, detail, selectedId, moving, onSelect }: ProbeOverviewProps) {
-  const collection = useProbeQuery<ProbeListResponse>("/probes", collectionRevision, "Could not load the probe map.");
+  const collection = useProbeQuery("/probes", collectionRevision, "Could not load the probe map.", loadMapProbes);
   const selected = selectedId !== null && detail.status === "success" ? detail.data : null;
 
   return (

@@ -17,7 +17,7 @@
 - `backend/domain.py` owns probe and grid rules. Keep it independent of FastAPI and SQLite.
 - `backend/main.py` configures the FastAPI application and registers routers and error handlers.
 - `backend/api/error_handlers.py` defines the shared error response and maps exceptions to HTTP responses.
-- `backend/api/probes.py` defines the probe endpoints and maps service results to HTTP responses.
+- `backend/api/probes_rest.py` defines the probe endpoints and maps service results to HTTP responses.
 - `backend/api/schemas.py` defines the HTTP request and response models and validates probe requests.
 - `backend/probe_service.py` executes probe use cases and controls transaction boundaries. All reads and writes of an atomic use case share the same session.
 - `backend/persistence/database.py` configures SQLite and owns transaction contexts. `backend/persistence/repository.py` executes persistence operations using the session supplied by the service. `backend/persistence/models.py` maps SQLite tables and constraints. Keep ORM models separate from domain models.

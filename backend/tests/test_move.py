@@ -149,7 +149,9 @@ def test_move_replays_original_result_after_restart_and_later_move(
     tmp_path: Path,
 ) -> None:
     database = tmp_path / "probes.sqlite3"
-    headers = {"Idempotency-Key": str(uuid4())}
+    key = "550e8400-e29b-41d4-a716-446655440000"
+    headers = {"Idempotency-Key": key}
+    retry_headers = {"Idempotency-Key": key.upper()}
     with TestClient(create_app(database)) as client:
         probe = launch(client)
         url = f"/probes/{probe['id']}/commands"
@@ -158,6 +160,11 @@ def test_move_replays_original_result_after_restart_and_later_move(
         assert first.json() == {**probe, "y": 1}
 
     with TestClient(create_app(database)) as client:
+        retry = client.post(url, json={"commands": "M"}, headers=retry_headers)
+        assert retry.status_code == 200
+        assert retry.json() == first.json()
+        assert client.get("/probes").json() == {"probes": [first.json()]}
+
         later = client.post(
             url, json={"commands": "MR"}, headers={"Idempotency-Key": str(uuid4())}
         )
