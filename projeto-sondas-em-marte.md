@@ -44,7 +44,7 @@
 | Decisão | Motivo | Alternativa avaliada |
 |---|---|---|
 | **Uma malha por sonda** | O enunciado descreve a “malha disponível para a sonda” e recebe os limites em cada lançamento. Cada sonda pode, assim, nascer com uma área própria (RN04). [Enunciado](https://github.com/barbaraport-rdstation/ai_copilot_challenge#readme) | Malha compartilhada. Exigiria uma regra para lançamentos posteriores com limites diferentes. |
-| **UUID v4 gerado no lançamento** | O caso de uso gera o ID com `str(uuid.uuid4())` antes da inserção. A chave primária protege a unicidade. | Inteiro autoincrementado. É menor, mas transfere a geração da identidade ao banco. |
+| **UUID v4 gerado no lançamento** | `launch_probe()` gera o ID antes da inserção. A chave primária protege a unicidade. | Um inteiro autoincrementado deixa a geração da identidade a cargo do banco. |
 | **FastAPI e arquitetura em camadas** | FastAPI cuida da validação HTTP e do OpenAPI. Apresentação, negócio e persistência têm responsabilidades próprias. O domínio pode ser testado em Python isoladamente. | Arquitetura hexagonal com portas explícitas. Útil se houver necessidade de substituir ou manter vários adaptadores. |
 | **SQLite em arquivo** | Uma tabela `probes` guarda o estado e os limites. Um volume do Compose preserva o arquivo após reinício (RNF05). | Memória com lock atenderia à concorrência em um processo. O estado seria perdido ao reiniciar a API. |
 | **Movimento atômico e transação de escrita antecipada** | O repositório SQLite usa `BEGIN IMMEDIATE` antes da leitura. Cada pedido confirmado parte do último estado gravado. A simulação grava só o resultado final. A espera limitada pode resultar em `503` (RN05 e RNF06). | Transação iniciada apenas na gravação. Dois pedidos poderiam calcular a partir da mesma posição. |
@@ -53,7 +53,7 @@
 | **Tailwind CSS no frontend** | O plugin `@tailwindcss/vite` gera CSS a partir das classes utilitárias usadas nos componentes React. | CSS puro exigiria escrever e manter as classes de estilo manualmente. |
 | **Limites de entrada** | Até `100` por eixo, inclusive, e até `1000` comandos por pedido. Isso limita o mapa a `101 × 101` posições e a simulação a `1000` passos. | Limitar apenas a renderização exigiria também uma regra separada para limitar a simulação. |
 | **HTTP `409` para avanço fora da malha** | A validade depende da posição, da direção e dos limites da sonda. A mesma sequência pode funcionar a partir de outro estado. [RFC 9110, seção 15.5.10](https://www.rfc-editor.org/rfc/rfc9110.html#section-15.5.10) | `422` também pode representar conteúdo que a API não consegue processar. Neste contrato, ele identifica falhas de validação da entrada. |
-| **Ferramental** | Python 3.13 e Node.js 24 no Compose. Na entrega de lançamento, adotar uv com `pyproject.toml` e `uv.lock` para sincronizar dependências de execução e desenvolvimento. Usar Ruff para lint e formatação e mypy para verificar tipos no backend. O frontend usa npm com `package-lock.json`. [Lock e sincronização no uv](https://docs.astral.sh/uv/concepts/projects/sync/) | Poetry oferece um fluxo equivalente de gerenciamento. O `requirements.txt` atual fixa apenas as dependências diretas. |
+| **Ferramental** | Python 3.13 e Node.js 24 no Compose. O backend usa uv com `pyproject.toml` e `uv.lock` para sincronizar dependências de execução e desenvolvimento, Ruff para lint e formatação e mypy para verificar tipos. O frontend usa npm com `package-lock.json`. [Lock e sincronização no uv](https://docs.astral.sh/uv/concepts/projects/sync/) | Poetry oferece um fluxo equivalente de gerenciamento. O `requirements.txt` da primeira entrega fixava apenas as dependências diretas. |
 | **Testes automatizados** | pytest cobre domínio e HTTP com SQLite temporário em arquivo. Vitest e React Testing Library cobrem o comportamento visível do React. O fluxo completo no Docker valida a integração entre as aplicações. [Vitest](https://vitest.dev/guide/) | Validação manual cobre a demonstração, mas tem custo maior para detectar regressões a cada entrega. |
 
 O código do backend e do frontend usa inglês em nomes de arquivos, módulos, classes, funções, variáveis, testes, comentários e docstrings.
@@ -99,9 +99,9 @@ Por exemplo, após `MRM`, a sonda está em `(1, 1, EAST)`. Com limite `max_x = 5
 flowchart LR
     React["Interface React"] -->|HTTP e JSON| API
     subgraph Backend["Backend Python"]
-        API["Apresentação · rotas FastAPI"] --> Casos["Negócio · casos de uso"]
-        Casos --> Dominio["Negócio · modelos e regras de domínio"]
-        Casos --> Repo["Persistência · repositório de sondas"]
+        API["Apresentação · rotas FastAPI"] --> Servico["Serviço · casos de uso"]
+        Servico --> Dominio["Domínio · modelos e regras da sonda"]
+        Servico --> Repo["Persistência · repositório de sondas"]
     end
     Repo --> Banco[("Arquivo SQLite")]
 ```
@@ -110,11 +110,12 @@ flowchart LR
 
 | Camada | Responsabilidade |
 |---|---|
-| **Apresentação** | Validar o formato das requisições, chamar o caso de uso e traduzir o resultado para o contrato HTTP da seção 3. |
-| **Negócio** | Coordenar lançamento, movimento e consultas. O domínio verifica os limites e calcula o próximo estado em Python. |
+| **Apresentação** | Validar a requisição, chamar o serviço e traduzir o resultado para o contrato HTTP da seção 3. |
+| **Serviço** | Executar o caso de uso. No lançamento, gerar o ID, criar a sonda e pedir ao repositório para gravá-la. |
+| **Domínio** | Definir a posição inicial, os limites da malha e as regras de movimento da sonda. |
 | **Persistência** | Converter registros SQLite em sondas, executar consultas e controlar a transação solicitada pelo caso de uso. |
 
-Os casos de uso coordenam o domínio e o repositório. O domínio recebe e devolve valores Python e pode rodar isoladamente nos testes.
+`launch_probe()` coordena o lançamento. O método `Probe.at_origin()` aplica a regra de posição inicial. O domínio recebe e devolve valores Python e pode rodar isoladamente nos testes.
 
 ### 4.2 Modelos de domínio
 
@@ -128,6 +129,8 @@ Os casos de uso coordenam o domínio e o repositório. O domínio recebe e devol
 Cada avanço soma um deslocamento à posição atual. `NORTH` soma `(0, 1)`, `EAST` soma `(1, 0)`, `SOUTH` soma `(0, -1)` e `WEST` soma `(-1, 0)`. Um giro muda apenas a direção. O domínio simula os passos sobre valores imutáveis e só devolve o estado final se todos os comandos forem válidos.
 
 ### 4.3 Modelo de persistência
+
+O SQLAlchemy ORM mapeia a tabela em `backend/database_models.py`. O repositório usa sessões para gravar objetos e confirmar ou desfazer transações. A inicialização cria tabelas ausentes e preserva tabelas existentes. A estrutura é compatível com os arquivos SQLite da implementação anterior, permitindo voltar à versão anterior sem converter os dados. Mudanças futuras na estrutura exigem uma migração explícita.
 
 A tabela `probes` representa uma sonda por linha. `id` é a chave primária. `x`, `y`, `max_x` e `max_y` são inteiros, e `direction` armazena o valor do enum como texto. Todos os campos são obrigatórios.
 
