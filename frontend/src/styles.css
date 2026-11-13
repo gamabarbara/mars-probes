@@ -267,19 +267,11 @@ select.mission-field {
   content: '';
   background:
     repeating-radial-gradient(
-        ellipse at 70% 104%,
-        transparent 0 12px,
-        #efab8d52 13px 14px,
-        transparent 15px 22px
-      )
-      bottom right / 62% 67% no-repeat,
-    repeating-radial-gradient(
-        ellipse at 24% -9%,
-        transparent 0 17px,
-        #efab8d47 18px 19px,
-        transparent 20px 26px
-      )
-      top left / 76% 73% no-repeat,
+      ellipse at 22% -18%,
+      transparent 0 16px,
+      #efab8d47 17px 18px,
+      transparent 19px 26px
+    ),
     radial-gradient(circle, #efab8d42 0 0.6px, transparent 1px) 0 0 / 7px 7px;
   mask-image: radial-gradient(ellipse at center, #0007, black);
   pointer-events: none;
