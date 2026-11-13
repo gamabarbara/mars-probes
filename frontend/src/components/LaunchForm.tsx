@@ -18,16 +18,16 @@ const gridValidation = {
 
 type LaunchFormProps = {
   disabled?: boolean;
-  onLaunched?: (probe: Probe) => void;
+  onLaunchComplete?: (probe: Probe | null) => void;
 };
 
-export function LaunchForm({ disabled, onLaunched }: LaunchFormProps) {
+export function LaunchForm({ disabled, onLaunchComplete }: LaunchFormProps) {
   const dialog = useRef<HTMLDialogElement>(null);
   const formElement = useRef<HTMLFormElement>(null);
   const xLimit = useRef<HTMLInputElement>(null);
   const { launching, error, setError, handleSubmit } = useLaunchProbe(
     dialog,
-    onLaunched
+    onLaunchComplete
   );
 
   function openDialog() {

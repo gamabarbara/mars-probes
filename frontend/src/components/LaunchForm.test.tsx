@@ -1,4 +1,10 @@
-import { cleanup, render, screen, within } from '@testing-library/react';
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, expect, test, vi } from 'vitest';
 
@@ -10,8 +16,8 @@ afterEach(cleanup);
 
 async function submitLaunch() {
   const user = userEvent.setup();
-  const onLaunched = vi.fn();
-  render(<LaunchForm onLaunched={onLaunched} />);
+  const onLaunchComplete = vi.fn();
+  render(<LaunchForm onLaunchComplete={onLaunchComplete} />);
   await user.click(screen.getByRole('button', { name: 'Launch probe' }));
   expect(
     screen.getByLabelText<HTMLSelectElement>('Initial direction').value
@@ -23,7 +29,7 @@ async function submitLaunch() {
   await user.type(screen.getByRole('spinbutton', { name: 'Y limit' }), '0');
   await user.selectOptions(screen.getByLabelText('Initial direction'), 'EAST');
   await user.click(screen.getByRole('button', { name: 'Launch' }));
-  return onLaunched;
+  return onLaunchComplete;
 }
 
 test('reports the confirmed probe and closes the dialog', async () => {
@@ -38,31 +44,15 @@ test('reports the confirmed probe and closes the dialog', async () => {
     .mockResolvedValue(Response.json(probe, { status: 201 }));
   mockApiTransport(requestMock);
 
-  const onLaunched = await submitLaunch();
+  const onLaunchComplete = await submitLaunch();
 
   expect(requestMock).toHaveBeenCalledWith('/probes', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ x: 5, y: 0, direction: 'EAST' }),
   });
-  expect(onLaunched).toHaveBeenCalledExactlyOnceWith(probe);
+  expect(onLaunchComplete).toHaveBeenCalledExactlyOnceWith(probe);
   expect(screen.queryByRole('dialog')).toBeNull();
-});
-
-test('shows the message returned by the API when launch fails', async () => {
-  const message = 'The database is busy. Try again in a moment.';
-  mockApiTransport(
-    vi
-      .fn()
-      .mockResolvedValue(
-        Response.json({ code: 'DATABASE_BUSY', message }, { status: 503 })
-      )
-  );
-
-  const onLaunched = await submitLaunch();
-
-  expect((await screen.findByRole('alert')).textContent).toBe(message);
-  expect(onLaunched).not.toHaveBeenCalled();
 });
 
 test('shows grid validation in English and clears it when the value is corrected', async () => {
@@ -80,36 +70,48 @@ test('shows grid validation in English and clears it when the value is corrected
   expect(x.validity.valid).toBe(true);
 });
 
-test('blocks dismissal while a launch is in progress', async () => {
-  let finishLaunch!: (response: Response) => void;
-  mockApiTransport(
-    vi.fn(
-      () =>
-        new Promise<Response>(resolve => {
-          finishLaunch = resolve;
-        })
-    )
-  );
-  const user = userEvent.setup();
-  render(<LaunchForm />);
-  await user.click(screen.getByRole('button', { name: 'Launch probe' }));
-  const dialog = screen.getByRole('dialog');
-  const fields = within(dialog);
-  await user.type(
-    fields.getByRole<HTMLInputElement>('spinbutton', { name: 'X limit' }),
-    '0'
-  );
-  await user.type(fields.getByRole('spinbutton', { name: 'Y limit' }), '0');
-  await user.click(fields.getByRole('button', { name: 'Launch' }));
+test(
+  'blocks dismissal while launching and closes the dialog on timeout',
+  { timeout: 10_000 },
+  async () => {
+    let finishLaunch!: (response: Response) => void;
+    mockApiTransport(
+      () => new Promise<Response>(resolve => (finishLaunch = resolve))
+    );
+    const user = userEvent.setup();
+    const onLaunchComplete = vi.fn();
+    render(<LaunchForm onLaunchComplete={onLaunchComplete} />);
+    await user.click(screen.getByRole('button', { name: 'Launch probe' }));
+    const dialog = screen.getByRole('dialog');
+    const fields = within(dialog);
+    await user.type(
+      fields.getByRole<HTMLInputElement>('spinbutton', { name: 'X limit' }),
+      '0'
+    );
+    await user.type(fields.getByRole('spinbutton', { name: 'Y limit' }), '0');
+    await user.click(fields.getByRole('button', { name: 'Launch' }));
 
-  expect(
-    fields.getByRole('button', { name: 'Cancel' }).matches(':disabled')
-  ).toBe(true);
-  expect(dialog.dispatchEvent(new Event('cancel', { cancelable: true }))).toBe(
-    false
-  );
-  finishLaunch(Response.json({ message: 'Try again.' }, { status: 503 }));
-  await fields.findByRole('alert');
-  await user.click(fields.getByRole('button', { name: 'Cancel' }));
-  expect(screen.queryByRole('dialog')).toBeNull();
-});
+    try {
+      expect(
+        fields.getByRole('button', { name: 'Cancel' }).matches(':disabled')
+      ).toBe(true);
+      expect(
+        fields.getByRole('button', { name: 'Launching…' }).matches(':disabled')
+      ).toBe(true);
+      expect(
+        dialog.dispatchEvent(new Event('cancel', { cancelable: true }))
+      ).toBe(false);
+      await waitFor(
+        () => expect(onLaunchComplete).toHaveBeenCalledExactlyOnceWith(null),
+        { timeout: 7_500 }
+      );
+      expect(screen.queryByRole('dialog')).toBeNull();
+      await user.click(screen.getByRole('button', { name: 'Launch probe' }));
+      expect(
+        screen.getByRole('button', { name: 'Launch' }).matches(':disabled')
+      ).toBe(false);
+    } finally {
+      finishLaunch?.(new Response(null, { status: 201 }));
+    }
+  }
+);

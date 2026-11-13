@@ -26,7 +26,9 @@ export const probeService = {
     y: number;
     direction: FormDataEntryValue | null;
   }): Promise<Probe> {
-    const { data } = await api.post<Probe>('/probes', input);
+    const { data } = await api.post<Probe>('/probes', input, {
+      timeout: 5_000,
+    });
     return data;
   },
 

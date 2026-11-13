@@ -14,7 +14,7 @@ export function App() {
     moving,
     setMoving,
     selectProbe,
-    handleLaunched,
+    handleLaunchComplete,
     refreshAfterMove,
   } = useMissionControl();
 
@@ -35,9 +35,12 @@ export function App() {
             <h1>Surface operations</h1>
             <p>Track and command your probes on the Martian plateau.</p>
           </div>
-          <LaunchForm disabled={moving} onLaunched={handleLaunched} />
+          <LaunchForm
+            disabled={moving}
+            onLaunchComplete={handleLaunchComplete}
+          />
         </div>
-        <div role="status" className="launch-notice">
+        <div role="status" className="launch-notice mission-success">
           {launch.probe && (
             <>
               <strong>Probe launched.</strong>{' '}
@@ -47,6 +50,11 @@ export function App() {
               </span>
             </>
           )}
+        </div>
+        <div role="alert" className="launch-notice mission-error">
+          {launch.count > 0 &&
+            !launch.probe &&
+            'Could not confirm whether the probe launched. Check the fleet before launching again.'}
         </div>
         <div className="mission-layout">
           <ProbeOverview

@@ -13,6 +13,8 @@ const second: Probe = { ...first, id: 'probe-2', direction: 'WEST' };
 const firstDetail = { ...first, max_x: 3, max_y: 5 };
 const secondDetail = { ...second, max_x: 7, max_y: 2 };
 const firstMapPage = '/probes?limit=100&offset=0';
+const uncertainLaunch =
+  'Could not confirm whether the probe launched. Check the fleet before launching again.';
 
 type MockRequest = Omit<RequestInit, 'headers'> & {
   headers?: Record<string, string>;
@@ -46,35 +48,41 @@ function selectProbe(user: ReturnType<typeof userEvent.setup>, id: string) {
   return user.click(screen.getByRole('button', { name: 'Select probe ' + id }));
 }
 
-test.each([true, false])(
-  'refreshes the table and map only after a successful launch (%s)',
-  async success => {
+async function submitLaunch(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: 'Launch probe' }));
+  const dialog = within(screen.getByRole('dialog', { name: 'Launch probe' }));
+  const x = dialog.getByRole<HTMLInputElement>('spinbutton', {
+    name: 'X limit',
+  });
+  await user.type(x, '5');
+  await user.type(dialog.getByRole('spinbutton', { name: 'Y limit' }), '3');
+  await user.click(dialog.getByRole('button', { name: 'Launch' }));
+  return { dialog, x };
+}
+
+test.each([201, 400, 422, 503])(
+  'handles a confirmed launch response (%s)',
+  async status => {
     const probes: Probe[] = [];
-    mockApi(probes, (url, options) => {
-      if (url !== '/probes' || options?.method !== 'POST') return;
-      if (!success)
-        return Response.json(
-          { message: 'Could not launch the probe.' },
-          { status: 503 }
-        );
+    const message = status === 400 ? undefined : 'The API rejected the launch.';
+    const requestMock = mockApi(probes, (url, options) => {
+      if (url !== '/probes' || options.method !== 'POST') return;
+      if (status !== 201) {
+        const code = status === 503 ? 'DATABASE_BUSY' : 'INVALID_INPUT';
+        return Response.json({ code, message }, { status });
+      }
       probes.push(first);
-      return Response.json(first, { status: 201 });
+      return Response.json(first, { status });
     });
     const user = userEvent.setup();
     render(<App />);
 
     await screen.findByText('No probes launched.');
-    expect(screen.getByText('No probes to display.')).toBeTruthy();
-    await user.click(screen.getByRole('button', { name: 'Launch probe' }));
-    const dialog = within(screen.getByRole('dialog', { name: 'Launch probe' }));
-    const x = dialog.getByRole<HTMLInputElement>('spinbutton', {
-      name: 'X limit',
-    });
-    await user.type(x, '5');
-    await user.type(dialog.getByRole('spinbutton', { name: 'Y limit' }), '3');
-    await user.click(dialog.getByRole('button', { name: 'Launch' }));
+    await screen.findByText('No probes to display.');
+    requestMock.mockClear();
+    const { dialog, x } = await submitLaunch(user);
 
-    if (success) {
+    if (status === 201) {
       const table = await screen.findByRole('table');
       expect(within(table).getByText(first.id)).toBeTruthy();
       expect(
@@ -91,12 +99,58 @@ test.each([true, false])(
       expect(screen.getByText('Probe launched.')).toBeTruthy();
     } else {
       expect((await dialog.findByRole('alert')).textContent).toBe(
-        'Could not launch the probe.'
+        message ?? 'Could not launch the probe.'
       );
       expect(x.value).toBe('5');
-      expect(screen.getByText('No probes launched.')).toBeTruthy();
-      expect(screen.getByText('No probes to display.')).toBeTruthy();
+      expect(requestMock).toHaveBeenCalledTimes(1);
     }
+  }
+);
+
+test.each(['lost response', 'generic 503'])(
+  'refreshes the fleet and keeps the selection after a %s',
+  async failure => {
+    const probes: Probe[] = [];
+    const requestMock = mockApi(probes, (url, options) => {
+      if (url !== '/probes' || options.method !== 'POST') return;
+      if (probes.length === 0) {
+        probes.push(first);
+        return Response.json(first, { status: 201 });
+      }
+      probes.push(second);
+      if (failure === 'lost response') throw new TypeError('Failed to fetch');
+      return Response.json(
+        { message: 'Service unavailable.' },
+        { status: 503 }
+      );
+    });
+    const user = userEvent.setup();
+    render(<App />);
+
+    await submitLaunch(user);
+    expect(await screen.findByText('Probe launched.')).toBeTruthy();
+    await screen.findByText(
+      'Cell (0, 0): 1 probe, selected probe facing North'
+    );
+    await screen.findByRole('table');
+    requestMock.mockClear();
+    await submitLaunch(user);
+
+    await screen.findByText(uncertainLaunch);
+    expect(screen.getByRole('alert').textContent).toBe(uncertainLaunch);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.queryByText('Probe launched.')).toBeNull();
+    await screen.findByText(
+      'Cell (0, 0): 2 probes, selected probe facing North'
+    );
+    expect(
+      within(await screen.findByRole('table')).getByText(second.id)
+    ).toBeTruthy();
+    expect(screen.getByText('ID: probe-1')).toBeTruthy();
+    expect(
+      requestMock.mock.calls.filter(([, options]) => options.method === 'POST')
+    ).toHaveLength(1);
+    expect(requestMock).toHaveBeenCalledTimes(3);
   }
 );
 

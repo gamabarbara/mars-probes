@@ -25,9 +25,9 @@ export function useMissionControl() {
     if (!moving) setSelectedId(id);
   }
 
-  function handleLaunched(probe: Probe) {
+  function handleLaunchComplete(probe: Probe | null) {
     setLaunch(({ count }) => ({ count: count + 1, probe }));
-    setSelectedId(probe.id);
+    if (probe) setSelectedId(probe.id);
   }
 
   function refreshAfterMove() {
@@ -42,7 +42,7 @@ export function useMissionControl() {
     moving,
     setMoving,
     selectProbe,
-    handleLaunched,
+    handleLaunchComplete,
     refreshAfterMove,
   };
 }

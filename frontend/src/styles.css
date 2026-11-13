@@ -201,8 +201,7 @@ select.mission-field {
 .mission-error {
   color: var(--error);
 }
-.mission-success,
-.launch-notice {
+.mission-success {
   color: var(--success);
 }
 .launch-notice:not(:empty) {
