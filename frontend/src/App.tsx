@@ -8,7 +8,9 @@ import { useMissionControl } from './modules/probes/hooks/useMissionControl';
 export function App() {
   const {
     launch,
+    collection,
     collectionRevision,
+    probeLabels,
     detail,
     selectedId,
     moving,
@@ -58,14 +60,16 @@ export function App() {
         </div>
         <div className="mission-layout">
           <ProbeOverview
-            collectionRevision={collectionRevision}
+            collection={collection}
             detail={detail}
+            probeLabels={probeLabels}
             selectedId={selectedId}
             moving={moving}
             onSelect={selectProbe}
           />
           <ProbeControl
             detail={detail}
+            probeLabels={probeLabels}
             selectedId={selectedId}
             moving={moving}
             onClearSelection={() => selectProbe(null)}
@@ -82,6 +86,7 @@ export function App() {
           </ProbeControl>
           <ProbeList
             revision={collectionRevision}
+            probeLabels={probeLabels}
             selectedId={selectedId}
             moving={moving}
             onSelect={selectProbe}

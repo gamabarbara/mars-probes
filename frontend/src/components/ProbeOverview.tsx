@@ -1,9 +1,8 @@
+import { useState } from 'react';
 import type { ReactNode } from 'react';
 
 import { directionArrows, directionLabels } from '../contants/directionLabels';
-import { useProbeQuery } from '../modules/probes/hooks/useProbeQuery';
 import type { ProbeQuery } from '../modules/probes/hooks/useProbeQuery';
-import { probeService } from '../modules/probes/services/probeService';
 import type {
   ProbeDetail,
   ProbeListResponse,
@@ -28,23 +27,19 @@ function QueryError({ message, onRetry, label }: QueryErrorProps) {
 }
 
 type ProbeOverviewProps = ProbeSelectionProps & {
-  collectionRevision: number;
+  collection: ProbeQuery<ProbeListResponse>;
+  probeLabels: ReadonlyMap<string, string>;
   detail: ProbeQuery<ProbeDetail>;
 };
 
 export function ProbeOverview({
-  collectionRevision,
+  collection,
+  probeLabels,
   detail,
   selectedId,
   moving,
   onSelect,
 }: ProbeOverviewProps) {
-  const collection = useProbeQuery<ProbeListResponse>(
-    '/probes',
-    collectionRevision,
-    'Could not load the probe map.',
-    probeService.listAll
-  );
   const selected =
     selectedId !== null && detail.status === 'success' ? detail.data : null;
 
@@ -65,6 +60,7 @@ export function ProbeOverview({
       {collection.status === 'success' ? (
         <ProbeMap
           probes={collection.data.probes}
+          probeLabels={probeLabels}
           selected={selected}
           selectedId={selectedId}
           moving={moving}
@@ -88,14 +84,42 @@ export function ProbeOverview({
   );
 }
 
+function ProbeFullId({ id }: { id: string }) {
+  const [message, setMessage] = useState('');
+
+  async function copyId() {
+    try {
+      await navigator.clipboard.writeText(id);
+      setMessage('ID copied.');
+    } catch {
+      setMessage('Could not copy ID. Select and copy it manually.');
+    }
+  }
+
+  return (
+    <details className="text-sm">
+      <summary className="cursor-pointer">Full ID</summary>
+      <div className="mt-2 space-y-2">
+        <p className="probe-id select-all">{id}</p>
+        <button type="button" className="mission-button" onClick={copyId}>
+          Copy ID
+        </button>
+        <p role="status">{message}</p>
+      </div>
+    </details>
+  );
+}
+
 type ProbeControlProps = Pick<ProbeSelectionProps, 'selectedId' | 'moving'> & {
   detail: ProbeQuery<ProbeDetail>;
+  probeLabels: ReadonlyMap<string, string>;
   onClearSelection: () => void;
   children: ReactNode;
 };
 
 export function ProbeControl({
   detail,
+  probeLabels,
   selectedId,
   moving,
   onClearSelection,
@@ -131,9 +155,12 @@ export function ProbeControl({
             </span>
             <div>
               <h3>Selected probe</h3>
-              <p className="probe-id">ID: {selectedId}</p>
+              <p className="probe-id">
+                ID: {probeLabels.get(selectedId) ?? selectedId}
+              </p>
             </div>
           </div>
+          <ProbeFullId key={`full-id-${selectedId}`} id={selectedId} />
           {detail.status === 'loading' && (
             <p role="status">Loading selected probe…</p>
           )}

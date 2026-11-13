@@ -7,12 +7,14 @@ import type {
 
 type Props = ProbeSelectionProps & {
   group: Probe[];
+  probeLabels: ReadonlyMap<string, string>;
   selected: ProbeDetail | null;
   maxY: number;
 };
 
 export function ProbeMapCell({
   group,
+  probeLabels,
   selected,
   selectedId,
   maxY,
@@ -23,6 +25,7 @@ export function ProbeMapCell({
   const { x, y, direction } = ordered[0];
   const activeIndex = ordered.findIndex(({ id }) => id === selectedId);
   const next = ordered[(activeIndex + 1) % ordered.length];
+  const nextLabel = probeLabels.get(next.id) ?? next.id;
   const count = group.length;
   const description = `Cell (${x}, ${y}): ${count} ${count === 1 ? 'probe' : 'probes'}`;
   const detail =
@@ -40,7 +43,7 @@ export function ProbeMapCell({
         type="button"
         className="map-marker"
         disabled={moving}
-        aria-label={`${detail}. Select probe ${next.id}`}
+        aria-label={`${detail}. Select probe ${nextLabel}`}
         aria-pressed={activeIndex >= 0}
         onClick={() => onSelect(next.id)}
       >

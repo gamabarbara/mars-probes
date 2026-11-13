@@ -5,10 +5,14 @@ import type { ProbeSelectionProps } from '../modules/probes/types/probe';
 const selectClass = 'mission-field';
 const buttonClass = 'mission-button';
 
-type ProbeListProps = ProbeSelectionProps & { revision: number };
+type ProbeListProps = ProbeSelectionProps & {
+  revision: number;
+  probeLabels: ReadonlyMap<string, string>;
+};
 
 export function ProbeList({
   revision,
+  probeLabels,
   selectedId,
   moving,
   onSelect,
@@ -94,30 +98,33 @@ export function ProbeList({
             </tr>
           </thead>
           <tbody>
-            {probes.map(({ id, x, y, direction }) => (
-              <tr
-                key={id}
-                className={selectedId === id ? 'fleet-selected' : undefined}
-              >
-                <td className="probe-id">{id}</td>
-                <td className="fleet-position">
-                  ({x}, {y})
-                </td>
-                <td>{directionLabels[direction]}</td>
-                <td>
-                  <button
-                    type="button"
-                    className={buttonClass}
-                    aria-label={`Select probe ${id}`}
-                    aria-pressed={selectedId === id}
-                    disabled={moving}
-                    onClick={() => onSelect(id)}
-                  >
-                    Select
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {probes.map(({ id, x, y, direction }) => {
+              const label = probeLabels.get(id) ?? id;
+              return (
+                <tr
+                  key={id}
+                  className={selectedId === id ? 'fleet-selected' : undefined}
+                >
+                  <td className="probe-id">{label}</td>
+                  <td className="fleet-position">
+                    ({x}, {y})
+                  </td>
+                  <td>{directionLabels[direction]}</td>
+                  <td>
+                    <button
+                      type="button"
+                      className={buttonClass}
+                      aria-label={`Select probe ${label}`}
+                      aria-pressed={selectedId === id}
+                      disabled={moving}
+                      onClick={() => onSelect(id)}
+                    >
+                      Select
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       )}

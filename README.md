@@ -21,9 +21,9 @@ Para parar, pressione `Ctrl+C` e execute `docker compose down` na raiz do reposi
 
 ## Primeiro voo
 
-1. Na interface, clique em **Launch probe**. Preencha **X limit** e **Y limit** com `2`, escolha **North** e clique em **Launch**. Anote o ID exibido em **Selected probe**.
-2. Lance outra sonda com limites `(4, 3)` e direção **North**. Em um banco vazio, o mapa exibe `2` na origem e a lista mostra IDs distintos.
-3. Na lista **Probe fleet**, clique em **Select** na linha do ID anotado. Você também pode clicar no marcador da origem até selecionar a primeira sonda. Cada clique alterna entre as sondas na célula. Envie `MRM` pelo botão **Send commands**. Confira a posição `(1, 1)` e a direção **East**. A segunda sonda permanece na origem.
+1. Na interface, clique em **Launch probe**. Preencha **X limit** e **Y limit** com `2`, escolha **North** e clique em **Launch**. Após carregar a frota, anote o ID curto exibido em **Selected probe**. Para copiar o UUID completo, abra **Full ID** e clique em **Copy ID**.
+2. Lance outra sonda com limites `(4, 3)` e direção **North**. Em um banco vazio, o mapa exibe `2` na origem e a lista mostra IDs curtos distintos.
+3. Na lista **Probe fleet**, clique em **Select** na linha da primeira sonda. Use o ID curto anotado para encontrá-la. Se os prefixos coincidirem, confira os limites `(2, 2)` no painel. Você também pode clicar no marcador da origem até selecioná-la. Cada clique alterna entre as sondas na célula. Envie `MRM` pelo botão **Send commands**. Confira a posição `(1, 1)` e a direção **East**. A segunda sonda permanece na origem.
 4. Envie `LMM` à primeira sonda. O terceiro comando ultrapassa a borda. A sequência inteira é rejeitada e a sonda permanece em `(1, 1)`, na direção **East**.
 5. Se estiver usando Docker, execute `docker compose restart backend`, recarregue a página e selecione as sondas. Confira os mesmos IDs, posições, direções e limites.
 

@@ -11,6 +11,7 @@ import { ProbeMapCell } from './ProbeMapCell';
 
 type ProbeMapProps = ProbeSelectionProps & {
   probes: Probe[];
+  probeLabels: ReadonlyMap<string, string>;
   selected: ProbeDetail | null;
 };
 type MapStyle = CSSProperties & {
@@ -20,12 +21,15 @@ type MapStyle = CSSProperties & {
 
 export function ProbeMap({
   probes,
+  probeLabels,
   selected,
   selectedId,
   moving,
   onSelect,
 }: ProbeMapProps) {
   const { cells, maxX, maxY } = buildProbeMap(probes, selected);
+  const selectedLabel =
+    selectedId === null ? null : (probeLabels.get(selectedId) ?? selectedId);
 
   if (cells.size === 0) {
     return (
@@ -84,6 +88,7 @@ export function ProbeMap({
               <ProbeMapCell
                 key={key}
                 group={group}
+                probeLabels={probeLabels}
                 selected={selected}
                 selectedId={selectedId}
                 maxY={maxY}
@@ -99,7 +104,10 @@ export function ProbeMap({
       </div>
       <figcaption className="map-caption">
         <span>
-          <i aria-hidden="true" /> Selected probe
+          <i aria-hidden="true" />{' '}
+          {selectedLabel === null
+            ? 'Selected probe'
+            : `Selected probe ${selectedLabel}`}
         </span>
         <span>
           Map bounds: (0, 0) to ({maxX}, {maxY})

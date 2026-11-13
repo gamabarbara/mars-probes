@@ -183,6 +183,101 @@ test('cycles through probes sharing a map cell by ID and keeps keyboard focus', 
   expect(await screen.findByText('ID: probe-1')).toBeTruthy();
 });
 
+test('distinguishes matching UUID prefixes across fleet pages and uses full IDs for API calls and copying', async () => {
+  const firstId = 'abcdef01-1000-4000-8000-000000000001';
+  const secondId = 'abcdef01-3000-4000-8000-000000000002';
+  const firstLabel = 'abcdef01-1';
+  const secondLabel = 'abcdef01-3';
+  const firstProbe = { ...first, id: firstId };
+  const secondProbe = { ...second, id: secondId };
+  const probes = [
+    firstProbe,
+    ...Array.from({ length: 19 }, (_, index) => ({
+      ...first,
+      id: `abcdef01-20${index.toString(16).padStart(2, '0')}-4000-8000-000000000003`,
+      x: 2,
+      y: 2,
+    })),
+    secondProbe,
+  ];
+  const requestMock = mockApi(probes, (url, { method }) => {
+    if (url === `/probes/${firstId}`)
+      return Response.json({ ...firstDetail, ...firstProbe });
+    if (url === `/probes/${secondId}`)
+      return Response.json({ ...secondDetail, ...secondProbe });
+    if (url === `/probes/${secondId}/commands` && method === 'POST') {
+      secondProbe.direction = 'NORTH';
+      return Response.json(secondProbe);
+    }
+  });
+  const user = userEvent.setup();
+  render(<App />);
+
+  const table = within(
+    await screen.findByRole('table', { name: 'Probe fleet' })
+  );
+  const map = within(await screen.findByRole('region', { name: 'Map grid' }));
+  expect(table.getByText(firstLabel)).toBeTruthy();
+  expect(table.queryByText(secondLabel)).toBeNull();
+  await user.click(
+    table.getByRole('button', { name: `Select probe ${firstLabel}` })
+  );
+  expect(await screen.findByText(`ID: ${firstLabel}`)).toBeTruthy();
+  expect(await screen.findByText(`Selected probe ${firstLabel}`)).toBeTruthy();
+  await map.findByText('Cell (0, 0): 2 probes, selected probe facing North');
+  expect(requestMock).toHaveBeenCalledWith(
+    `/probes/${firstId}`,
+    expect.anything()
+  );
+
+  await user.click(
+    map.getByRole('button', {
+      name: new RegExp(`Select probe ${secondLabel}$`),
+    })
+  );
+  expect(await screen.findByText(`ID: ${secondLabel}`)).toBeTruthy();
+  expect(await screen.findByText(`Selected probe ${secondLabel}`)).toBeTruthy();
+  await map.findByText('Cell (0, 0): 2 probes, selected probe facing West');
+  expect(requestMock).toHaveBeenCalledWith(
+    `/probes/${secondId}`,
+    expect.anything()
+  );
+  await user.click(screen.getByRole('button', { name: 'Next' }));
+  const nextPage = within(
+    await screen.findByRole('table', { name: 'Probe fleet' })
+  );
+  expect(nextPage.getByText(secondLabel)).toBeTruthy();
+  expect(
+    nextPage
+      .getByRole('button', { name: `Select probe ${secondLabel}` })
+      .getAttribute('aria-pressed')
+  ).toBe('true');
+
+  await user.click(screen.getByText('Full ID'));
+  const copyButton = screen.getByRole('button', { name: 'Copy ID' });
+  await user.click(copyButton);
+  expect(await screen.findByText('ID copied.')).toBeTruthy();
+  expect(await navigator.clipboard.readText()).toBe(secondId);
+  const writeText = vi
+    .spyOn(navigator.clipboard, 'writeText')
+    .mockRejectedValueOnce(new Error('Clipboard denied'));
+  await user.click(copyButton);
+  expect(
+    await screen.findByText('Could not copy ID. Select and copy it manually.')
+  ).toBeTruthy();
+  expect(screen.getByText(secondId, { exact: true })).toBeTruthy();
+  writeText.mockRestore();
+
+  const form = within(screen.getByRole('form', { name: 'Move probe' }));
+  await user.type(form.getByRole('textbox', { name: 'Commands' }), 'R');
+  await user.click(form.getByRole('button', { name: 'Send commands' }));
+  await form.findByText('Move confirmed.', { exact: false });
+  expect(requestMock).toHaveBeenCalledWith(
+    `/probes/${secondId}/commands`,
+    expect.objectContaining({ method: 'POST', body: '{"commands":"R"}' })
+  );
+});
+
 test('maps probes from every page and keeps selection when paging or sorting', async () => {
   const probes = [
     first,

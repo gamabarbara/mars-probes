@@ -19,6 +19,7 @@ test('shows loading and then the empty list', async () => {
   mockApiTransport(vi.fn().mockResolvedValue(Response.json({ probes: [] })));
   render(
     <ProbeList
+      probeLabels={new Map()}
       revision={0}
       selectedId={null}
       moving={false}
@@ -48,6 +49,7 @@ test('pages through results and resets the offset when sorting changes', async (
   const user = userEvent.setup();
   render(
     <ProbeList
+      probeLabels={new Map()}
       revision={0}
       selectedId={null}
       moving={false}
@@ -102,6 +104,7 @@ test('shows an API error and retries the same query', async () => {
   const user = userEvent.setup();
   render(
     <ProbeList
+      probeLabels={new Map()}
       revision={0}
       selectedId={null}
       moving={false}
@@ -132,6 +135,7 @@ test('ignores an older response that arrives after the new ordering', async () =
   const user = userEvent.setup();
   render(
     <ProbeList
+      probeLabels={new Map()}
       revision={0}
       selectedId={null}
       moving={false}
