@@ -28,7 +28,7 @@ class ProbeService:
     def list_probes(
         self,
         *,
-        limit: int,
+        limit: int | None,
         offset: int,
         sort_by: ProbeSortField,
         order: Literal["asc", "desc"],

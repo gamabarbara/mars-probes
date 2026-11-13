@@ -235,22 +235,27 @@ def test_lists_committed_position_while_another_connection_writes(
     }
 
 
-def test_list_defaults_to_twenty_probes(
+def test_list_returns_all_probes_unless_paginated(
     client: TestClient, database_path: Path
 ) -> None:
-    ids = [f"probe-{index:02}" for index in range(23)]
+    ids = [f"probe-{index:03}" for index in range(105)]
     with closing(connect(database_path)) as writer:
         writer.executemany(
             "INSERT INTO probes (id, x, y, direction, max_x, max_y) VALUES (?, 0, 0, 'NORTH', 0, 0)",
             [(probe_id,) for probe_id in ids],
         )
         writer.commit()
-        first_page = client.get("/probes")
-        next_page = client.get("/probes", params={"offset": 20})
 
-    assert first_page.status_code == next_page.status_code == 200
-    assert [probe["id"] for probe in first_page.json()["probes"]] == ids[:20]
-    assert [probe["id"] for probe in next_page.json()["probes"]] == ids[20:]
+    for params, expected_ids in (
+        ({}, ids),
+        ({"order": "desc"}, ids[::-1]),
+        ({"offset": 0}, ids[:20]),
+        ({"offset": 20}, ids[20:40]),
+    ):
+        response = client.get("/probes", params=params)
+
+        assert response.status_code == 200
+        assert [probe["id"] for probe in response.json()["probes"]] == expected_ids
 
 
 @pytest.mark.parametrize(
@@ -290,8 +295,10 @@ def test_list_applies_pagination_and_order(
 @pytest.mark.parametrize(
     "query",
     [
+        "limit=",
         "limit=0",
         "limit=101",
+        "offset=",
         "offset=-1",
         "offset=9223372036854775808",
         "sort_by=max_x",
@@ -315,13 +322,10 @@ def test_list_documents_query_parameters_and_responses(client: TestClient) -> No
         "sort_by",
         "order",
     }
-    limit = next(
-        parameter
-        for parameter in operation["parameters"]
-        if parameter["name"] == "limit"
-    )
-    assert limit["required"] is False
-    assert limit["schema"]["default"] == 20
+    for parameter in operation["parameters"]:
+        if parameter["name"] in {"limit", "offset"}:
+            assert parameter["required"] is False
+            assert "default" not in parameter["schema"]
     responses = operation["responses"]
     assert responses.keys() == {"200", "422"}
     assert responses["422"]["content"]["application/json"]["schema"] == {

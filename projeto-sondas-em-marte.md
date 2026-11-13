@@ -17,7 +17,7 @@
 
 - **RF01** – Lançar sonda. Cada chamada recebe `x` e `y` como limites da nova sonda e `direction` como direção inicial. Retorna um `id` único, posição e direção.
 - **RF02** – Mover sonda. Recebe o `id` e a sequência de comandos. Retorna o mesmo `id`, a posição final e a direção final.
-- **RF03** – Listar sondas. Retorna uma página de `probes` com `id`, posição e direção atuais.
+- **RF03** – Listar sondas. Retorna todas as sondas por padrão no campo `probes`, com `id`, posição e direção atuais.
 - **RF04** – Retornar erros padronizados para sonda inexistente, entrada inválida e sequência rejeitada.
 - **RF05** – Consultar sonda por ID. Retorna o estado atual e os limites da malha da sonda selecionada.
 
@@ -73,7 +73,7 @@ Os corpos de requisição e resposta usam `application/json`. O `id` é um UUID 
 - **Movimento.** O ID da sonda vai na rota. `commands` é uma string obrigatória com `1` a `1000` caracteres, formada apenas por `M`, `L` e `R` em maiúsculas. A API valida toda a entrada antes de buscar a sonda e simular os passos. Assim, `MMMMMMMX` retorna `422` mesmo quando um avanço anterior sairia da malha. Para entrada válida, o ID inexistente retorna `404` e o avanço fora da malha retorna `409`.
 - **Consultas.** Nas respostas, `x` e `y` são as coordenadas atuais da sonda. A listagem vazia retorna `{"probes":[]}`. A consulta por ID inclui os limites inclusivos em `max_x` e `max_y`.
 - **Reenvio de movimento.** Cada envio é tratado como um novo movimento, mesmo com os mesmos comandos.
-- **Paginação e ordenação.** Em `GET /probes`, `limit` aceita de `1` a `100` e tem valor padrão `20`. `offset` indica quantos registros pular e começa em `0`. Use `sort_by=id|x|y|direction` e `order=asc|desc`. A ordem padrão é `id` crescente. Direções seguem ordem alfabética e empates usam `id` crescente. Por exemplo, `GET /probes?limit=20&offset=20&sort_by=x&order=desc` busca a segunda página de 20 sondas por `x` decrescente. Um `offset` após o último registro retorna `{"probes":[]}`. Valores inválidos retornam `422 INVALID_INPUT`.
+- **Paginação e ordenação.** Sem `limit` e `offset`, `GET /probes` retorna todas as sondas na ordem solicitada. O parâmetro `limit` aceita de `1` a `100`. O parâmetro `offset` indica quantos registros pular. Quando omitido, a consulta começa pelo primeiro registro. Se a requisição informar `offset` sem `limit`, a API retorna até 20 sondas, inclusive para `offset=0`. Use `sort_by=id|x|y|direction` e `order=asc|desc`. A ordem padrão é `id` crescente. Direções seguem ordem alfabética e empates usam `id` crescente. Por exemplo, `GET /probes?limit=20&offset=20&sort_by=x&order=desc` busca a segunda página de 20 sondas por `x` decrescente. Um `offset` após o último registro retorna `{"probes":[]}`. Valores inválidos retornam `422 INVALID_INPUT`.
 
 ### 3.1 Respostas de erro
 

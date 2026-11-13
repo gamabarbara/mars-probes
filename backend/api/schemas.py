@@ -20,8 +20,21 @@ class CommandsRequest(BaseModel):
 
 
 class ProbeListQuery(BaseModel):
-    limit: int = Field(default=20, ge=1, le=100)
-    offset: int = Field(default=0, ge=0, le=2**63 - 1)
+    limit: int | None = Field(
+        default=None,
+        ge=1,
+        le=100,
+        description=(
+            "Maximum number of probes to return. Defaults to 20 when only offset "
+            "is provided. Omit both pagination parameters to return all probes."
+        ),
+    )
+    offset: int | None = Field(
+        default=None,
+        ge=0,
+        le=2**63 - 1,
+        description="Number of probes to skip. Starts at the first probe when omitted.",
+    )
     sort_by: ProbeSortField = ProbeSortField.ID
     order: Literal["asc", "desc"] = "asc"
 

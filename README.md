@@ -42,7 +42,7 @@ A API recebe e retorna JSON. Explore os esquemas e execute pedidos no [Swagger U
 | Método e rota | Operação | Sucesso |
 | --- | --- | --- |
 | `POST /probes` | Lança uma sonda. No pedido, `x` e `y` são os limites da malha. | `201 Created` |
-| `GET /probes` | Lista sondas com paginação e ordenação. | `200 OK` |
+| `GET /probes` | Lista todas as sondas por padrão, com paginação e ordenação opcionais. | `200 OK` |
 | `GET /probes/{id}` | Consulta a posição, a direção e os limites da sonda. | `200 OK` |
 | `POST /probes/{id}/commands` | Executa uma sequência de comandos. | `200 OK` |
 

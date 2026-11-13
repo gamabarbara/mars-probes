@@ -22,6 +22,7 @@ from services.probe_service import ProbeService
 
 PROBE_PREFIX = "/probes"
 PROBE_TAG = "probes"
+DEFAULT_PAGE_SIZE = 20
 
 
 def create_probes_router(service: ProbeService) -> APIRouter:
@@ -36,9 +37,13 @@ def create_probes_router(service: ProbeService) -> APIRouter:
 
     @read_router.get("", summary="List probes", response_model=ProbeListResponse)
     def list_all(query: Annotated[ProbeListQuery, Query()]) -> dict[str, list[Probe]]:
+        limit = query.limit
+        if limit is None and query.offset is not None:
+            limit = DEFAULT_PAGE_SIZE
+
         probes = service.list_probes(
-            limit=query.limit,
-            offset=query.offset,
+            limit=limit,
+            offset=query.offset or 0,
             sort_by=query.sort_by,
             order=query.order,
         )

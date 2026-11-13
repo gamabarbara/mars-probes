@@ -28,7 +28,7 @@ class ProbeRepository:
     def list_probes(
         self,
         *,
-        limit: int,
+        limit: int | None,
         offset: int,
         sort_by: ProbeSortField,
         descending: bool,
@@ -40,7 +40,11 @@ class ProbeRepository:
         if sort_by != ProbeSortField.ID:
             query = query.order_by(ProbeRecord.id.asc())
 
-        records = self.session.scalars(query.limit(limit).offset(offset))
+        query = query.limit(limit)
+        if offset > 0:
+            query = query.offset(offset)
+
+        records = self.session.scalars(query)
         return [_to_probe(record) for record in records]
 
     def get(self, probe_id: str) -> Probe | None:
