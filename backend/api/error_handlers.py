@@ -21,14 +21,16 @@ class OutOfBoundsResponse(ErrorResponse):
     step: int
 
 
-VALIDATION_RESPONSES = {422: {"model": ErrorResponse}}
-WRITE_ERROR_RESPONSES = {
+type ResponseMetadata = dict[int | str, dict[str, type[ErrorResponse]]]
+
+VALIDATION_RESPONSES: ResponseMetadata = {422: {"model": ErrorResponse}}
+WRITE_ERROR_RESPONSES: ResponseMetadata = {
     **VALIDATION_RESPONSES,
     400: {"model": ErrorResponse},
     503: {"model": ErrorResponse},
 }
-PROBE_NOT_FOUND_RESPONSES = {404: {"model": ErrorResponse}}
-COMMAND_ERROR_RESPONSES = {
+PROBE_NOT_FOUND_RESPONSES: ResponseMetadata = {404: {"model": ErrorResponse}}
+COMMAND_ERROR_RESPONSES: ResponseMetadata = {
     **PROBE_NOT_FOUND_RESPONSES,
     409: {"model": OutOfBoundsResponse},
 }
@@ -55,7 +57,7 @@ def register_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(OutOfBoundsError)
     async def out_of_bounds(_: Request, error: OutOfBoundsError) -> JSONResponse:
-        code = "OUT_OF_BOUNDS"
+        code: Literal["OUT_OF_BOUNDS"] = "OUT_OF_BOUNDS"
         body = OutOfBoundsResponse(
             code=code,
             message=error_message(code, step=error.step),

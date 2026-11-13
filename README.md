@@ -70,7 +70,7 @@ Em caso de falha, use o campo `code` para identificar o erro. Por exemplo, `422 
 
 ## Desenvolvimento sem Docker
 
-**Pré-requisitos** · Python 3.13, uv, Node.js 24 e npm. Execute os comandos a partir da raiz do clone.
+**Pré-requisitos** · Python 3.13, uv, Node.js 24.15.0 ou superior na série 24 e npm. Execute os comandos a partir da raiz do clone.
 
 Instale as dependências conforme os arquivos de lock do projeto.
 
@@ -104,10 +104,11 @@ Se a interface abrir mas falhar ao carregar sondas, confira se o [Swagger UI](ht
 
 Depois de instalar as dependências locais, execute na raiz do repositório.
 
-**Backend** · Ruff verifica o código. Pytest cobre as regras de domínio, a API e a persistência com bancos SQLite temporários.
+**Backend** · Ruff analisa o código e mypy verifica os tipos. Pytest cobre as regras de domínio, a API e a persistência com bancos SQLite temporários.
 
 ```sh
 uv --directory backend run --locked ruff check .
+uv --directory backend run --locked mypy .
 uv --directory backend run --locked pytest
 ```
 
